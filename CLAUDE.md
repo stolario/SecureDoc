@@ -1,9 +1,13 @@
 # SecureDoc — working agreements
 
-## Git
+## How a change ends (owner's standing instruction, 2026-09-18)
 
-- **Everything goes onto `main`.** Commit on `main` and `git push -u origin main`; the owner wants
-  the change visible in the checkout right after it is pushed (standing instruction, 2026-09-18).
-- This holds over a branch a session is told to use: if the work was done on such a branch, move
-  `main` onto it (`git merge --ff-only <branch>`) and push `main`.
-- No pull request unless it is asked for by name.
+Always, in this order, without being asked again:
+
+1. **Commit everything** — nothing is left uncommitted in the working tree.
+2. **Push.** The work lands on `main`: push it there (if it was committed on a branch a session was
+   told to use, move `main` onto it with `git merge --ff-only <branch>` and push `main`).
+3. **Then switch the folder to `main` and update it** — `git checkout main && git pull origin main`,
+   so the checkout ends on an up-to-date `main` and the change is visible when the app is run.
+
+No pull request unless it is asked for by name.
