@@ -450,9 +450,9 @@ body > .bg-anim { position: fixed; z-index: -1; }
 .bg-layer {
     position: absolute;
     inset: 0;
-    animation: bg-swap 8s ease-in-out infinite;
+    animation: bg-swap 16s ease-in-out infinite;
 }
-.bg-layer-b { animation-delay: -4s; }   /* half a cycle behind: what one layer hides, the other shows */
+.bg-layer-b { animation-delay: -8s; }   /* half a cycle behind: what one layer hides, the other shows */
 /* The two mirrored ease-in-out curves always sum to 1, so the tiling keeps an even weight of ink
    through the swap instead of fading out and back in. */
 @keyframes bg-swap {
