@@ -9,5 +9,9 @@ Always, in this order, without being asked again:
    told to use, move `main` onto it with `git merge --ff-only <branch>` and push `main`).
 3. **Then switch the folder to `main` and update it** — `git checkout main && git pull origin main`,
    so the checkout ends on an up-to-date `main` and the change is visible when the app is run.
+4. **Delete the branch that is done with** — once `main` carries its commits (check with
+   `git branch --merged main`), remove it locally and on the remote:
+   `git branch -d <branch> && git push origin --delete <branch>`. No stale session branches are
+   left behind.
 
 No pull request unless it is asked for by name.
