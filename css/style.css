@@ -459,9 +459,20 @@ body > .bg-anim { position: fixed; z-index: -1; }
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
 }
+/* Held still where the system asks for reduced motion — with a line in the picker saying so, or the
+   animated background just looks broken. */
+.motion-note { display: none; }
 @media (prefers-reduced-motion: reduce) {
     .bg-layer { animation: none; }
     .bg-layer-b { opacity: 0; }
+    .motion-note {
+        display: block;
+        margin: 2px 8px 4px;
+        max-width: 190px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--muted);
+    }
 }
 .tg-cell {
     width: 16px;
