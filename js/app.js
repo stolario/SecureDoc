@@ -783,6 +783,14 @@
             penrose: function (ink) {
                 const tiling = penroseImage(ink);
                 return tiling ? { image: 'url("' + tiling.url + '")', size: tiling.size } : { image: 'none', size: null };
+            },
+            // Animated: the same tiling as `penrose`, cross-fading with the copy that inks the other
+            // half of the rhombi, so the two greys slowly trade places. `swap` is the second image —
+            // the cross-fade itself is CSS (.bg-layer), see paint().
+            'penrose-swap': function (ink) {
+                const thick = penroseImage(ink), thin = penroseImage(ink, true);
+                if (!thick || !thin) return { image: 'none', size: null };
+                return { image: 'url("' + thick.url + '")', swap: 'url("' + thin.url + '")', size: thick.size };
             }
         };
         const DEFAULT_PATTERN = 'none';
@@ -848,10 +856,11 @@
         // a wheel of ten. Drawing is asynchronous (toBlob); until it's ready the pattern shows as none and
         // apply() runs again when the image arrives.
         const penroseCache = {};
-        function penroseImage(inkCss) {
-            const cached = penroseCache[inkCss];
+        function penroseImage(inkCss, swapped) {
+            const key = inkCss + (swapped ? '|swapped' : '');
+            const cached = penroseCache[key];
             if (cached) return cached.url ? cached : null;
-            penroseCache[inkCss] = {};
+            penroseCache[key] = {};
 
             const cssSize = Math.min(Math.max(window.screen.width, window.screen.height, 1280), 2560);
             // at most 3200 device px a side: beyond that the pixel pass gets slow and memory-hungry
@@ -900,11 +909,12 @@
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, S, S);
             ctx.translate(half, half);
-            ctx.fillStyle = ctx.strokeStyle = '#b3b3b3';  // thick rhombi: ~30% of the ink
+            const inked = swapped ? 1 : 0;                // which rhombi get the fill: thick, or thin
+            ctx.fillStyle = ctx.strokeStyle = '#b3b3b3';  // filled rhombi: ~30% of the ink
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (const t of tris) {
-                if (t[0] !== 0) continue;
+                if (t[0] !== inked) continue;
                 ctx.moveTo(t[1], t[2]); ctx.lineTo(t[3], t[4]); ctx.lineTo(t[5], t[6]); ctx.closePath();
             }
             ctx.fill();
@@ -928,18 +938,47 @@
             }
             ctx.putImageData(img, 0, 0);                  // putImageData ignores the transform
             canvas.toBlob(function (blob) {
-                if (!blob) { delete penroseCache[inkCss]; return; }
-                penroseCache[inkCss] = { url: URL.createObjectURL(blob), size: cssSize };
+                if (!blob) { delete penroseCache[key]; return; }
+                penroseCache[key] = { url: URL.createObjectURL(blob), size: cssSize };
                 apply(color, pattern);
             });
             return null;
         }
 
+        // An animated pattern cross-fades two images, which one element's background cannot do, so it
+        // is painted on a pair of stacked layers appended to the element: behind the page for <body>,
+        // inside the swatch in the picker. They are built on first use and kept for later.
+        const animBoxes = new WeakMap();
+        function animBox(el, wanted) {
+            let box = animBoxes.get(el);
+            if (!box) {
+                if (!wanted) return null;
+                box = document.createElement('span');
+                box.className = 'bg-anim';
+                box.setAttribute('aria-hidden', 'true');
+                for (let i = 0; i < 2; i++) {
+                    const layer = document.createElement('span');
+                    layer.className = i === 0 ? 'bg-layer' : 'bg-layer bg-layer-b';
+                    box.appendChild(layer);
+                }
+                el.appendChild(box);
+                animBoxes.set(el, box);
+            }
+            box.hidden = !wanted;
+            return wanted ? box : null;
+        }
+
         function paint(el, colorName, patternName, scale) {
             const p = PATTERNS[patternName](ink(colorName));
+            const tile = p.size ? (p.size * scale) + 'px ' + (p.size * scale) + 'px' : '';
             el.style.backgroundColor = COLORS[colorName];
-            el.style.backgroundImage = p.image;
-            el.style.backgroundSize = p.size ? (p.size * scale) + 'px ' + (p.size * scale) + 'px' : '';
+            el.style.backgroundImage = p.swap ? 'none' : p.image;   // animated: the layers carry it
+            el.style.backgroundSize = p.swap ? '' : tile;
+            const box = animBox(el, !!p.swap);
+            if (!box) return;
+            box.children[0].style.backgroundImage = p.image;
+            box.children[1].style.backgroundImage = p.swap;
+            box.children[0].style.backgroundSize = box.children[1].style.backgroundSize = tile;
         }
 
         function apply(colorName, patternName) {
@@ -988,8 +1027,10 @@
             picker.hidden = false;
             apply(color, pattern);                        // draws the pattern swatches
             const rect = btn.getBoundingClientRect();
+            const top = rect.bottom + 4;
             picker.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - picker.offsetWidth - 8)) + 'px';
-            picker.style.top = (rect.bottom + 4) + 'px';
+            picker.style.top = top + 'px';
+            picker.style.maxHeight = Math.max(160, window.innerHeight - top - 8) + 'px';
         });
         document.addEventListener('mousedown', function (e) {
             if (!picker.hidden && !picker.contains(e.target) && !btn.contains(e.target)) picker.hidden = true;

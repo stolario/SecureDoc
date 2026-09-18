@@ -235,6 +235,7 @@ plaintext only in memory while encryption/decryption is running.
 | Images | insert from a file or the clipboard, resize by dragging a corner |
 | Export to PDF | page printing (`window.print`) |
 | Background around the page | colour black / dark blue / dark grey / grey / sepia / white plus a faint pattern (none / dots / grid / lines / diagonal / waves / Penrose tiling — the aperiodic one drawn once onto a canvas / Octagons — regular octagons and squares / Voronoi — irregular polygons from fixed, periodically repeated seeds, in a seamless SVG tile); a view preference in `localStorage`, not in the file |
+| Animated background | its own group in the picker, one entry so far: the Penrose tiling with its two greys trading places. The same drawing as the static one plus the copy that inks the other half of the rhombi, cross-fading on two stacked layers behind the page (`.bg-anim`, `z-index: -1`, hence `isolation` on `<body>`; 20 s a cycle, 6 s on the swatch so it shows what it does). Both mirrored `ease-in-out` curves sum to 1, so the weight of ink stays even through the swap; `prefers-reduced-motion` holds the tiling still |
 | Paste | HTML is cleaned; foreign images are pulled into the store when the browser hands over the bytes |
 
 Continuous scrolling, no paged view.
