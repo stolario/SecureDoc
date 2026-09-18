@@ -450,18 +450,15 @@ body > .bg-anim { position: fixed; z-index: -1; }
 .bg-layer {
     position: absolute;
     inset: 0;
-    animation: bg-swap 20s ease-in-out infinite;
+    animation: bg-swap 8s ease-in-out infinite;
 }
-.bg-layer-b { animation-delay: -10s; }
+.bg-layer-b { animation-delay: -4s; }   /* half a cycle behind: what one layer hides, the other shows */
 /* The two mirrored ease-in-out curves always sum to 1, so the tiling keeps an even weight of ink
    through the swap instead of fading out and back in. */
 @keyframes bg-swap {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
 }
-/* A swatch has a few seconds to show what it does; the page has the whole session. */
-.bg-pat-chip .bg-layer { animation-duration: 6s; }
-.bg-pat-chip .bg-layer-b { animation-delay: -3s; }
 @media (prefers-reduced-motion: reduce) {
     .bg-layer { animation: none; }
     .bg-layer-b { opacity: 0; }

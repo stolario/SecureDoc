@@ -785,15 +785,21 @@
                 return tiling ? { image: 'url("' + tiling.url + '")', size: tiling.size } : { image: 'none', size: null };
             },
             // Animated: the same tiling as `penrose`, cross-fading with the copy that inks the other
-            // half of the rhombi, so the two greys slowly trade places. `swap` is the second image —
-            // the cross-fade itself is CSS (.bg-layer), see paint().
+            // half of the rhombi, so the two greys trade places. `swap` is the second image — the
+            // cross-fade itself is CSS (.bg-layer), see paint(). The fill is deeper than the static
+            // pattern's: at 30% of the ink the two ends of the swap are ~10 levels of 255 apart,
+            // which is not a change the eye can follow.
             'penrose-swap': function (ink) {
-                const thick = penroseImage(ink), thin = penroseImage(ink, true);
+                const thick = penroseImage(ink, false, SWAP_FILL), thin = penroseImage(ink, true, SWAP_FILL);
                 if (!thick || !thin) return { image: 'none', size: null };
                 return { image: 'url("' + thick.url + '")', swap: 'url("' + thin.url + '")', size: thick.size };
             }
         };
         const DEFAULT_PATTERN = 'none';
+        // How much of the ink the filled rhombi of a Penrose drawing carry (as a grey on white,
+        // darker = more ink): faint for the static pattern, half again as strong for the animated
+        // one, whose whole point is that you can see the fill move.
+        const PENROSE_FILL = '#b3b3b3', SWAP_FILL = '#8c8c8c';
         let color = DEFAULT, pattern = DEFAULT_PATTERN;
 
         function ink(name) { return DARK.has(name) ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.11)'; }
@@ -856,8 +862,9 @@
         // a wheel of ten. Drawing is asynchronous (toBlob); until it's ready the pattern shows as none and
         // apply() runs again when the image arrives.
         const penroseCache = {};
-        function penroseImage(inkCss, swapped) {
-            const key = inkCss + (swapped ? '|swapped' : '');
+        function penroseImage(inkCss, swapped, fill) {
+            const grey = fill || PENROSE_FILL;
+            const key = inkCss + '|' + grey + (swapped ? '|swapped' : '');
             const cached = penroseCache[key];
             if (cached) return cached.url ? cached : null;
             penroseCache[key] = {};
@@ -910,7 +917,7 @@
             ctx.fillRect(0, 0, S, S);
             ctx.translate(half, half);
             const inked = swapped ? 1 : 0;                // which rhombi get the fill: thick, or thin
-            ctx.fillStyle = ctx.strokeStyle = '#b3b3b3';  // filled rhombi: ~30% of the ink
+            ctx.fillStyle = ctx.strokeStyle = grey;
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (const t of tris) {
