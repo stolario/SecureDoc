@@ -790,8 +790,13 @@
             // sinking into a fill of their own weight. `swap` is the second image; the cross-fade
             // itself is CSS (.bg-layer), see paint().
             'penrose-swap': function (ink) {
-                const a = penroseImage(ink, SWAP_FILLS, true);
-                const b = penroseImage(ink, [SWAP_FILLS[1], SWAP_FILLS[0]], true);
+                // Denser ink than the still patterns: the deep fill has to stay clear of the lines
+                // (see SWAP_FILLS), which costs the swap a third of its tonal range — this buys it back.
+                const dense = ink.replace(/,([\d.]+)\)$/, function (_, alpha) {
+                    return ',' + (Number(alpha) * 1.35) + ')';
+                });
+                const a = penroseImage(dense, SWAP_FILLS, true);
+                const b = penroseImage(dense, [SWAP_FILLS[1], SWAP_FILLS[0]], true);
                 if (!a || !b) return { image: 'none', size: null };
                 return { image: 'url("' + a.url + '")', swap: 'url("' + b.url + '")', size: a.size };
             }
@@ -803,7 +808,10 @@
         // a tone of their own, far apart, because that is what trades places: a faint tint that
         // merely comes and goes measures ~10 levels of 255 and reads as a still background.
         const PENROSE_FILLS = ['#b3b3b3', null];
-        const SWAP_FILLS = ['#2e2e2e', '#e6e6e6'];
+        // The animated pair's deep fill stops at 60% of the ink on purpose: its lines are drawn from
+        // 85% up (see contrastEdges), and a fill that reached them would pass through their tone on
+        // its way across and take the lines with it for those moments.
+        const SWAP_FILLS = ['#666666', '#ebebeb'];
         let color = DEFAULT, pattern = DEFAULT_PATTERN;
 
         function ink(name) { return DARK.has(name) ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.11)'; }
@@ -949,12 +957,15 @@
                 ctx.globalCompositeOperation = 'difference';
                 ctx.strokeStyle = '#fff';
                 ctx.stroke();
-                // A plain inverse would leave the lines averaging exactly what the fills average, and
-                // the cross-fade passes through that average: for a moment the whole tiling washes out.
-                // Weighting every line towards the ink keeps the lines darker than the mean fill, so
-                // the drawing survives the crossing as a line drawing.
+                // A plain inverse sweeps the same range as the fills, so somewhere in the cross-fade a
+                // line meets the tone of the rhombus under it and disappears — a phase of the swap with
+                // no lines at all. Pressing the inverse three quarters of the way into the ink lifts
+                // every line clear of every fill: they run 85% (over the deep fill) to 98% (over the
+                // pale one) against fills of 60% down to 8%, so the gap is never less than a quarter of
+                // the ink, and widest — over half — exactly at the crossing, where the fills meet in the
+                // middle and the tiling is carried by its lines alone.
                 ctx.globalCompositeOperation = 'source-over';
-                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.strokeStyle = 'rgba(0,0,0,0.75)';
                 ctx.stroke();
             }
 
