@@ -786,11 +786,12 @@
             },
             // Animated: the same tiling as `penrose`, cross-fading with the copy that gives each kind
             // of rhombus the other's tone, so the two greys trade places — the light ones darken while
-            // the dark ones lighten. `swap` is the second image; the cross-fade itself is CSS
-            // (.bg-layer), see paint().
+            // the dark ones lighten, and the dividing lines turn over with them (contrastEdges), never
+            // sinking into a fill of their own weight. `swap` is the second image; the cross-fade
+            // itself is CSS (.bg-layer), see paint().
             'penrose-swap': function (ink) {
-                const a = penroseImage(ink, SWAP_FILLS);
-                const b = penroseImage(ink, [SWAP_FILLS[1], SWAP_FILLS[0]]);
+                const a = penroseImage(ink, SWAP_FILLS, true);
+                const b = penroseImage(ink, [SWAP_FILLS[1], SWAP_FILLS[0]], true);
                 if (!a || !b) return { image: 'none', size: null };
                 return { image: 'url("' + a.url + '")', swap: 'url("' + b.url + '")', size: a.size };
             }
@@ -865,8 +866,8 @@
         // a wheel of ten. Drawing is asynchronous (toBlob); until it's ready the pattern shows as none and
         // apply() runs again when the image arrives.
         const penroseCache = {};
-        function penroseImage(inkCss, fills) {
-            const key = inkCss + '|' + fills.join(',');
+        function penroseImage(inkCss, fills, contrastEdges) {
+            const key = inkCss + '|' + fills.join(',') + (contrastEdges ? '|contrast' : '');
             const cached = penroseCache[key];
             if (cached) return cached.url ? cached : null;
             penroseCache[key] = {};
@@ -931,14 +932,31 @@
                 ctx.fill();
                 ctx.stroke();
             });
-            ctx.strokeStyle = '#000';
             ctx.lineWidth = 1.3 * dpr;
             ctx.lineJoin = 'round';
             ctx.beginPath();
             for (const t of tris) {                       // the two legs; the base is the rhombus diagonal
                 ctx.moveTo(t[5], t[6]); ctx.lineTo(t[1], t[2]); ctx.lineTo(t[3], t[4]);
             }
-            ctx.stroke();
+            if (!contrastEdges) {
+                ctx.strokeStyle = '#000';                 // the static pattern: one weight, full ink
+                ctx.stroke();
+            } else {
+                // Each line comes out as the inverse of the tone it lies on (white, differenced), so a
+                // deep fill gets a pale line and a pale fill a deep one; where two kinds meet, the line
+                // carries both, one tone to each side. When the fills trade places the lines turn over
+                // with them, in antiphase.
+                ctx.globalCompositeOperation = 'difference';
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+                // A plain inverse would leave the lines averaging exactly what the fills average, and
+                // the cross-fade passes through that average: for a moment the whole tiling washes out.
+                // Weighting every line towards the ink keeps the lines darker than the mean fill, so
+                // the drawing survives the crossing as a line drawing.
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.stroke();
+            }
 
             const m = /rgba\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(inkCss);
             const img = ctx.getImageData(0, 0, S, S), d = img.data;
