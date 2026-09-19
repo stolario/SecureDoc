@@ -418,7 +418,7 @@ button.primary { width: 100%; padding: 11px; margin-top: 18px; font-size: 15px; 
 #bg-picker .fp-caption:first-child { margin-top: 2px; }
 .bg-pat-groups { display: flex; flex-direction: column; gap: 8px; }
 .bg-pat-grid { display: grid; grid-template-columns: repeat(3, 1fr); align-content: start; gap: 4px; padding: 0 2px 2px; }
-.bg-pat-irregular { border-top: 1px solid var(--border); padding-top: 8px; }
+.bg-pat-irregular, .bg-pat-illusions { border-top: 1px solid var(--border); padding-top: 8px; }
 .bg-pat {
     display: flex;
     flex-direction: column;
@@ -428,6 +428,7 @@ button.primary { width: 100%; padding: 11px; margin-top: 18px; font-size: 15px; 
     border: none;
     background: none;
     font-size: 11px;
+    white-space: nowrap;                    /* a label going bold when chosen must not wrap and jolt the grid */
 }
 .bg-pat:hover { background: #eef1f5; }
 .bg-pat.current { font-weight: 600; }

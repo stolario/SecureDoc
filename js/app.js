@@ -737,7 +737,9 @@
         const DARK = new Set(['black', 'navy', 'darkgrey']);
         const DEFAULT = 'grey';
         // Each pattern is drawn in `ink` — a faint dark tone over light colours, a faint light one over
-        // dark ones — on top of the chosen colour. `size` is the tile in px (null: the image tiles itself).
+        // dark ones — on top of the chosen colour (`bg`, for the one that needs tones of its own).
+        // `size` is the tile in px (null: the image tiles itself), `height` its height if not square,
+        // `position` where the tiling is anchored if not at the top left.
         const PATTERNS = {
             none: function () { return { image: 'none', size: null }; },
             dots: function (ink) {
@@ -772,9 +774,7 @@
             },
             voronoi: function (ink) {
                 // Wider SVG edges need softer ink to visually approach the rasterized Penrose lines.
-                const edgeInk = ink.replace(/,([\d.]+)\)$/, function (_, alpha) {
-                    return ',' + (Number(alpha) * 1.2) + ')';
-                });
+                const edgeInk = inkTimes(ink, 1.2);
                 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480">'
                     + '<path d="' + voronoiPath() + '" fill="none" stroke="' + edgeInk
                     + '" stroke-width="2" stroke-linejoin="round"/></svg>';
@@ -792,13 +792,57 @@
             'penrose-swap': function (ink) {
                 // Denser ink than the still patterns: the deep fill has to stay clear of the lines
                 // (see SWAP_FILLS), which costs the swap a third of its tonal range — this buys it back.
-                const dense = ink.replace(/,([\d.]+)\)$/, function (_, alpha) {
-                    return ',' + (Number(alpha) * 1.35) + ')';
-                });
+                const dense = inkTimes(ink, 1.35);
                 const a = penroseImage(dense, SWAP_FILLS, true);
                 const b = penroseImage(dense, [SWAP_FILLS[1], SWAP_FILLS[0]], true);
                 if (!a || !b) return { image: 'none', size: null };
                 return { image: 'url("' + a.url + '")', swap: 'url("' + b.url + '")', size: a.size };
+            },
+
+            // ── Illusions: drawings the eye does not take as they are ──
+            // Reversible cubes: a rhombille tiling in three tones reads as a stack of cubes that keeps
+            // turning over by itself — seen from above one moment, from below (or as hollow corners)
+            // the next. Nothing in the drawing changes; the eye cannot settle on one way up.
+            cubes: function (ink) {
+                return { image: svgTile(28, 48, cubeFaces(ink, CUBE_TONES)), size: 28, height: 48 };
+            },
+            // Zöllner: the long diagonals are exactly parallel, but every other one carries short
+            // horizontal crossings and the rest vertical ones, and the lines seem to lean towards
+            // and away from each other.
+            zollner: function (ink) {
+                return { image: svgTile(ZOLLNER.tile, ZOLLNER.tile, zollnerPath(inkTimes(ink, ZOLLNER.ink))), size: ZOLLNER.tile };
+            },
+            // Café wall: straight, parallel rows of tiles, every other row shifted by half a tile, and
+            // the mortar lines between them look like wedges. The illusion lives on the contrast of
+            // the tiles and on the mortar lying halfway between them — a faint ink tints the tiles
+            // but kills the tilt — so the tiles are drawn as tones of their own, one lighter and one
+            // darker than the background by the same step, with the mortar in the middle: the wall
+            // is as strong as it has to be, and the background keeps its brightness on average.
+            'cafe-wall': function (ink, bg) {
+                const t = tonePair(bg, CAFE.step), w = CAFE.tile, m = CAFE.mortar;
+                const body = '<rect width="' + (2 * w) + '" height="' + (2 * (w + m)) + '" fill="' + t.light + '"/>'
+                    + '<path d="M0 0h' + w + 'v' + w + 'h-' + w + 'Z'
+                    + 'M' + (w / 2) + ' ' + (w + m) + 'h' + w + 'v' + w + 'h-' + w + 'Z" fill="' + t.dark + '"/>'
+                    + '<path d="M0 ' + w + 'h' + (2 * w) + 'v' + m + 'H0Z'
+                    + 'M0 ' + (2 * w + m) + 'h' + (2 * w) + 'v' + m + 'H0Z" fill="' + t.mid + '"/>';
+                return { image: svgTile(2 * w, 2 * (w + m), body), size: 2 * w, height: 2 * (w + m) };
+            },
+            // Kanizsa: four notched discs and a square between them that nobody drew — its edges
+            // are seen running across the empty background. See KANIZSA for what makes them hold.
+            kanizsa: function (ink) {
+                const T = KANIZSA.tile;
+                return { image: svgTile(T, 2 * T, kanizsaPath(inkTimes(ink, KANIZSA.ink))), size: T, height: 2 * T, position: 'center' };
+            },
+
+            // Animated: the cubes lit from the other side. The flat rhombi go from the lightest tone
+            // to the darkest while the side faces shift down a step, and since the eye takes light as
+            // coming from above, a dark flat face is a bottom: the cubes turn inside out and back.
+            'cubes-flip': function (ink) {
+                return {
+                    image: svgTile(28, 48, cubeFaces(ink, CUBE_TONES)),
+                    swap: svgTile(28, 48, cubeFaces(ink, [CUBE_TONES[2], CUBE_TONES[0], CUBE_TONES[1]])),
+                    size: 28, height: 48
+                };
             }
         };
         const DEFAULT_PATTERN = 'none';
@@ -812,9 +856,104 @@
         // 85% up (see contrastEdges), and a fill that reached them would pass through their tone on
         // its way across and take the lines with it for those moments.
         const SWAP_FILLS = ['#666666', '#ebebeb'];
+        // The cubes' faces in ink, [flat rhombi, left sides, right sides]: the flat ones bare, as tops
+        // in the light; the sides one and two steps darker, as faces turned away from it.
+        const CUBE_TONES = [0, 0.7, 1.4];
+        // Diagonals half a tile apart (34 px across), a crossing every `spacing` px along x (17 along
+        // the line), each reaching `reach` px either side of it. Denser ink and a heavier stroke than
+        // the plain line patterns: antialiasing smears a thin diagonal far more than the crisp
+        // horizontal and vertical crossings, and once the long lines stop reading as lines the
+        // pattern is a scatter of dashes with no tilt to see.
+        const ZOLLNER = { tile: 96, spacing: 12, reach: 12, ink: 2.2, width: 1.5 };
+        // Square tiles, the mortar a tenth of their size: the tilt needs thin mortar and weakens as it
+        // thickens. `step` is the light-to-dark span of the tiles in levels of 255 (see tonePair).
+        const CAFE = { tile: 22, mortar: 2, step: 56 };
+        // The missing square is only seen when the eye takes the four discs as one group, so the
+        // squares stand far apart: `tile` from one to the next, over twice the side, with every other
+        // row shifted by half so the empty lanes between them don't form a grid of their own. Packed
+        // closer, into an even lattice of notched discs, the eye groups them as it likes and no square
+        // wins. The discs give away 2 × radius / side = 0.625 of each edge: more makes the contour
+        // stronger, but the four discs then close into one ring-like glyph. They are solid areas of
+        // dense ink, as the contour lives on their contrast.
+        const KANIZSA = { tile: 128, side: 48, radius: 15, ink: 2.5 };
         let color = DEFAULT, pattern = DEFAULT_PATTERN;
 
         function ink(name) { return DARK.has(name) ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.11)'; }
+        function inkTimes(inkCss, k) {
+            return inkCss.replace(/,([\d.]+)\)$/, function (_, alpha) { return ',' + (Number(alpha) * k) + ')'; });
+        }
+        function svgTile(w, h, body) {
+            const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h
+                + '" viewBox="0 0 ' + w + ' ' + h + '">' + body + '</svg>';
+            return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+        }
+
+        // Rhombille tiling — hexagons each cut into three rhombi, rows offset by half — in a 28×48
+        // tile. The hexagons are 28 wide and 32 tall, a hair wider than regular (27.7), so the tile
+        // lands on whole pixels. One path per tone: faces of a kind never overlap at a shared edge.
+        function cubeFaces(inkCss, tones) {
+            const d = ['', '', ''];
+            [[0, 0], [28, 0], [14, 24], [0, 48], [28, 48]].forEach(function (c) {
+                const x = c[0], y = c[1];
+                d[0] += 'M' + x + ' ' + (y - 16) + 'L' + (x + 14) + ' ' + (y - 8) + 'L' + x + ' ' + y + 'L' + (x - 14) + ' ' + (y - 8) + 'Z';
+                d[1] += 'M' + (x - 14) + ' ' + (y - 8) + 'L' + x + ' ' + y + 'L' + x + ' ' + (y + 16) + 'L' + (x - 14) + ' ' + (y + 8) + 'Z';
+                d[2] += 'M' + x + ' ' + y + 'L' + (x + 14) + ' ' + (y - 8) + 'L' + (x + 14) + ' ' + (y + 8) + 'L' + x + ' ' + (y + 16) + 'Z';
+            });
+            return d.map(function (path, i) {
+                return tones[i] ? '<path d="' + path + '" fill="' + inkTimes(inkCss, tones[i]) + '"/>' : '';
+            }).join('');
+        }
+
+        // Diagonals y = x + c at every half tile, those at whole tiles crossed by horizontal strokes
+        // and the rest by vertical ones — 45° to the line either way, as the illusion is classically
+        // drawn. Copies from the neighbouring tiles are drawn as well and clipped, so strokes crossing
+        // the tile edge stay whole; one path, so a crossing isn't inked twice.
+        function zollnerPath(stroke) {
+            const T = ZOLLNER.tile, s = ZOLLNER.spacing, a = ZOLLNER.reach;
+            let d = '';
+            [-T, -T / 2, 0, T / 2, T].forEach(function (c) {
+                const vertical = (c / (T / 2)) % 2 !== 0;
+                d += 'M' + (-T) + ' ' + (c - T) + 'L' + (2 * T) + ' ' + (c + 2 * T);
+                for (let x = (vertical ? s / 2 : 0) - s; x <= T + s; x += s) {
+                    const y = x + c;
+                    if (y < -a || y > T + a) continue;
+                    d += vertical ? 'M' + x + ' ' + (y - a) + 'V' + (y + a) : 'M' + (x - a) + ' ' + y + 'H' + (x + a);
+                }
+            });
+            return '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + ZOLLNER.width + '"/>';
+        }
+
+        // Four discs at the corners of each square, each with the quarter that points into the square
+        // cut away. The tile is one tile wide and two tall, with a square in its very middle (so a
+        // centred swatch shows a whole one) and the rows above and below shifted by half, on its
+        // corners — cut in four there and joined by the repeat.
+        function kanizsaPath(fill) {
+            const T = KANIZSA.tile, h = KANIZSA.side / 2, r = KANIZSA.radius;
+            let d = '';
+            [[T / 2, T], [0, 0], [T, 0], [0, 2 * T], [T, 2 * T]].forEach(function (o) {
+                [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) {
+                    const cx = o[0] + q[0] * h, cy = o[1] + q[1] * h, sx = -q[0], sy = -q[1];
+                    d += 'M' + cx + ' ' + cy + 'L' + (cx + sx * r) + ' ' + cy
+                        + 'A' + r + ' ' + r + ' 0 1 ' + (sx * sy > 0 ? 0 : 1) + ' ' + cx + ' ' + (cy + sy * r) + 'Z';
+                });
+            });
+            return '<path d="' + d + '" fill="' + fill + '"/>';
+        }
+
+        // Two opaque tones `step` levels apart (by luma) on the given background: one lighter and one
+        // darker than it by the same amount where there is room both ways, pushed off the end of the
+        // scale where there isn't (white, and nearly so on black), plus the tone halfway between.
+        function tonePair(bgHex, step) {
+            const c = [1, 3, 5].map(function (i) { return parseInt(bgHex.slice(i, i + 2), 16); });
+            const luma = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+            const down = Math.min(luma, Math.max(step / 2, step - (255 - luma)));
+            const up = Math.min(255 - luma, step - down);
+            const light = c.map(function (v) { return v + (255 - v) * up / (255 - luma || 1); });
+            const dark = c.map(function (v) { return v * (1 - down / (luma || 1)); });
+            const mid = light.map(function (v, i) { return (v + dark[i]) / 2; });
+            function css(v) { return 'rgb(' + v.map(Math.round).join(',') + ')'; }
+            return { light: css(light), dark: css(dark), mid: css(mid) };
+        }
 
         // Periodic, deterministically jittered seeds give irregular Voronoi cells with seamless
         // tile boundaries. Cache the geometry; changing the background only changes the ink.
@@ -1010,11 +1149,12 @@
         }
 
         function paint(el, colorName, patternName, scale) {
-            const p = PATTERNS[patternName](ink(colorName));
-            const tile = p.size ? (p.size * scale) + 'px ' + (p.size * scale) + 'px' : '';
+            const p = PATTERNS[patternName](ink(colorName), COLORS[colorName]);
+            const tile = p.size ? (p.size * scale) + 'px ' + ((p.height || p.size) * scale) + 'px' : '';
             el.style.backgroundColor = COLORS[colorName];
             el.style.backgroundImage = p.swap ? 'none' : p.image;   // animated: the layers carry it
             el.style.backgroundSize = p.swap ? '' : tile;
+            el.style.backgroundPosition = p.swap ? '' : (p.position || '');
             const box = animBox(el, !!p.swap);
             if (!box) return;
             box.children[0].style.backgroundImage = p.image;
