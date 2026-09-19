@@ -786,15 +786,13 @@
             },
             // Animated: the same tiling as `penrose`, cross-fading with the copy that gives each kind
             // of rhombus the other's tone, so the two greys trade places — the light ones darken while
-            // the dark ones lighten, and the dividing lines turn over with them (contrastEdges), never
-            // sinking into a fill of their own weight. `swap` is the second image; the cross-fade
-            // itself is CSS (.bg-layer), see paint().
-            'penrose-swap': function (ink) {
-                // Denser ink than the still patterns: the deep fill has to stay clear of the lines
-                // (see SWAP_FILLS), which costs the swap a third of its tonal range — this buys it back.
-                const dense = inkTimes(ink, 1.35);
-                const a = penroseImage(dense, SWAP_FILLS, true);
-                const b = penroseImage(dense, [SWAP_FILLS[1], SWAP_FILLS[0]], true);
+            // the dark ones lighten. The dividing lines are dark on every background (see lineVeil),
+            // so they stand clear of both fills at every phase. `swap` is the second image; the
+            // cross-fade itself is CSS (.bg-layer), see paint().
+            'penrose-swap': function (ink, bg) {
+                const veil = lineVeil(bg);
+                const a = penroseImage(ink, SWAP_FILLS, veil);
+                const b = penroseImage(ink, [SWAP_FILLS[1], SWAP_FILLS[0]], veil);
                 if (!a || !b) return { image: 'none', size: null };
                 return { image: 'url("' + a.url + '")', swap: 'url("' + b.url + '")', size: a.size };
             },
@@ -852,10 +850,13 @@
         // a tone of their own, far apart, because that is what trades places: a faint tint that
         // merely comes and goes measures ~10 levels of 255 and reads as a still background.
         const PENROSE_FILLS = ['#b3b3b3', null];
-        // The animated pair's deep fill stops at 60% of the ink on purpose: its lines are drawn from
-        // 85% up (see contrastEdges), and a fill that reached them would pass through their tone on
-        // its way across and take the lines with it for those moments.
-        const SWAP_FILLS = ['#666666', '#ebebeb'];
+        // The animated pair: the deep tone at 81% of the ink, the pale one at 11%.
+        const SWAP_FILLS = ['#303030', '#e4e4e4'];
+        // How much darker than the background each line of the animated Penrose is, in levels of 255.
+        // Over the fills a line comes out about that much darker than the rhombus beside it, too:
+        // slightly less on light backgrounds (the fills are darker than the background), more on
+        // dark ones (they are lighter).
+        const SWAP_LINE_DROP = 36;
         // The cubes' faces in ink, [flat rhombi, left sides, right sides]: the flat ones bare, as tops
         // in the light; the sides one and two steps darker, as faces turned away from it.
         const CUBE_TONES = [0, 0.7, 1.4];
@@ -944,8 +945,7 @@
         // darker than it by the same amount where there is room both ways, pushed off the end of the
         // scale where there isn't (white, and nearly so on black), plus the tone halfway between.
         function tonePair(bgHex, step) {
-            const c = [1, 3, 5].map(function (i) { return parseInt(bgHex.slice(i, i + 2), 16); });
-            const luma = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+            const c = rgbOf(bgHex), luma = lumaOf(c);
             const down = Math.min(luma, Math.max(step / 2, step - (255 - luma)));
             const up = Math.min(255 - luma, step - down);
             const light = c.map(function (v) { return v + (255 - v) * up / (255 - luma || 1); });
@@ -953,6 +953,20 @@
             const mid = light.map(function (v, i) { return (v + dark[i]) / 2; });
             function css(v) { return 'rgb(' + v.map(Math.round).join(',') + ')'; }
             return { light: css(light), dark: css(dark), mid: css(mid) };
+        }
+        function rgbOf(hex) { return [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16); }); }
+        function lumaOf(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+
+        // The animated Penrose draws its lines in black, as a veil that takes SWAP_LINE_DROP levels off
+        // the background's brightness (all there is, on black). A line in the background's own ink is
+        // light on dark backgrounds, lighter than both fills, and next to the deep one it all but
+        // vanishes; a line that turned over with its fill (pale on deep, deep on pale) would have to
+        // pass through the fill's tone somewhere in the cross-fade and vanish for that moment. Darker
+        // than the background, a line is darker than both fills on a dark background, whose fills are
+        // lighter, and on a light one darker than the rhombus under it by a fixed share of it — clear
+        // of both at every phase either way.
+        function lineVeil(bgHex) {
+            return Math.min(1, SWAP_LINE_DROP / (lumaOf(rgbOf(bgHex)) || 1));
         }
 
         // Periodic, deterministically jittered seeds give irregular Voronoi cells with seamless
@@ -1013,8 +1027,10 @@
         // a wheel of ten. Drawing is asynchronous (toBlob); until it's ready the pattern shows as none and
         // apply() runs again when the image arrives.
         const penroseCache = {};
-        function penroseImage(inkCss, fills, contrastEdges) {
-            const key = inkCss + '|' + fills.join(',') + (contrastEdges ? '|contrast' : '');
+        // `veil`: draw the lines in black at this opacity over the fills (see lineVeil) rather than in
+        // the pattern's ink.
+        function penroseImage(inkCss, fills, veil) {
+            const key = inkCss + '|' + fills.join(',') + (veil ? '|veil ' + veil.toFixed(3) : '');
             const cached = penroseCache[key];
             if (cached) return cached.url ? cached : null;
             penroseCache[key] = {};
@@ -1059,7 +1075,8 @@
             }
 
             // Draw as grey levels (darker = more ink), then turn that into ink colour + alpha, so shared
-            // edges and the seam inside each rhombus don't get painted twice at partial opacity.
+            // edges and the seam inside each rhombus don't get painted twice at partial opacity. Lines
+            // drawn as a veil go into the green channel instead, the fills keeping red to themselves.
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = S;
             const ctx = canvas.getContext('2d');
@@ -1070,7 +1087,7 @@
             fills.forEach(function (grey, kind) {    // kind 0 = thick rhombi, 1 = thin ones
                 if (!grey) return;
                 // stroked as well as filled: the seam inside each rhombus closes without a hairline
-                ctx.fillStyle = ctx.strokeStyle = grey;
+                ctx.fillStyle = ctx.strokeStyle = veil ? 'rgb(' + parseInt(grey.slice(1, 3), 16) + ',255,255)' : grey;
                 ctx.beginPath();
                 for (const t of tris) {
                     if (t[0] !== kind) continue;
@@ -1085,36 +1102,26 @@
             for (const t of tris) {                       // the two legs; the base is the rhombus diagonal
                 ctx.moveTo(t[5], t[6]); ctx.lineTo(t[1], t[2]); ctx.lineTo(t[3], t[4]);
             }
-            if (!contrastEdges) {
+            if (!veil) {
                 ctx.strokeStyle = '#000';                 // the static pattern: one weight, full ink
-                ctx.stroke();
             } else {
-                // Each line comes out as the inverse of the tone it lies on (white, differenced), so a
-                // deep fill gets a pale line and a pale fill a deep one; where two kinds meet, the line
-                // carries both, one tone to each side. When the fills trade places the lines turn over
-                // with them, in antiphase.
-                ctx.globalCompositeOperation = 'difference';
-                ctx.strokeStyle = '#fff';
-                ctx.stroke();
-                // A plain inverse sweeps the same range as the fills, so somewhere in the cross-fade a
-                // line meets the tone of the rhombus under it and disappears — a phase of the swap with
-                // no lines at all. Pressing the inverse three quarters of the way into the ink lifts
-                // every line clear of every fill: they run 85% (over the deep fill) to 98% (over the
-                // pale one) against fills of 60% down to 8%, so the gap is never less than a quarter of
-                // the ink, and widest — over half — exactly at the crossing, where the fills meet in the
-                // middle and the tiling is carried by its lines alone.
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-                ctx.stroke();
+                // multiplying by magenta clears green where the line covers and leaves red alone
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.strokeStyle = '#f0f';
             }
+            ctx.stroke();
 
             const m = /rgba\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(inkCss);
             const img = ctx.getImageData(0, 0, S, S), d = img.data;
             const r = +m[1], g = +m[2], b = +m[3], a = +m[4];
             for (let i = 0; i < d.length; i += 4) {
-                const level = 255 - d[i];
-                d[i] = r; d[i + 1] = g; d[i + 2] = b;
-                d[i + 3] = Math.round(level * a * 1.6);   // edges a bit stronger than the simple patterns
+                // edges a bit stronger than the simple patterns
+                const fill = (255 - d[i]) * a * 1.6 / 255;
+                const line = veil ? (255 - d[i + 1]) / 255 * veil : 0;
+                const alpha = line + fill * (1 - line);  // black line over the inked fill
+                const share = alpha ? fill * (1 - line) / alpha : 0;
+                d[i] = r * share; d[i + 1] = g * share; d[i + 2] = b * share;
+                d[i + 3] = Math.round(alpha * 255);
             }
             ctx.putImageData(img, 0, 0);                  // putImageData ignores the transform
             canvas.toBlob(function (blob) {
