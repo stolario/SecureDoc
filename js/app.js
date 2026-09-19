@@ -780,6 +780,18 @@
                     + '" stroke-width="2" stroke-linejoin="round"/></svg>';
                 return { image: 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")', size: 480 };
             },
+            // Truchet: square tiles of 2 × 2 cells, each half inked and half bare — the inked half on
+            // top, right, bottom or left. Which one follows the diagonals: every rising diagonal of
+            // tiles (↗) carries a coin toss between upper right and lower left, every falling one (↘)
+            // between upper left and lower right, and a tile inks the side both point to. The halves
+            // join into a labyrinth of both tones, one cell wide, turning at every other step, with
+            // squares nested in rings wherever four tiles face one corner.
+            truchet: function (ink) {
+                const n = 2 * TRUCHET.tiles, s = TRUCHET.cell;
+                const body = '<path transform="scale(' + s + ')" d="' + truchetPath() + '" fill="'
+                    + inkTimes(ink, TRUCHET.ink) + '"/>';
+                return { image: svgTile(n * s, n * s, body), size: n * s };
+            },
             penrose: function (ink) {
                 const tiling = penroseImage(ink, PENROSE_FILLS);
                 return tiling ? { image: 'url("' + tiling.url + '")', size: tiling.size } : { image: 'none', size: null };
@@ -877,6 +889,9 @@
         // stronger, but the four discs then close into one ring-like glyph. They are solid areas of
         // dense ink, as the contour lives on their contrast.
         const KANIZSA = { tile: 128, side: 48, radius: 15, ink: 2.5 };
+        // `tiles` Truchet tiles a side before the pattern repeats, each 2 × 2 cells of `cell` px; the
+        // inked half at `ink` times the ink.
+        const TRUCHET = { tiles: 48, cell: 10, ink: 1 };
         let color = DEFAULT, pattern = DEFAULT_PATTERN;
 
         function ink(name) { return DARK.has(name) ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.11)'; }
@@ -1020,6 +1035,43 @@
             // One stroked path keeps shared cell edges at the same opacity as the other edges.
             cachedVoronoiPath = paths.join('');
             return cachedVoronoiPath;
+        }
+
+        // The inked cells of the Truchet tile, in cell units, as one path of row runs. The coins are a
+        // fixed-seed LCG, so the pattern is the same on every start; the diagonals are counted modulo
+        // the tile, so each one runs on unbroken across the repeat.
+        let cachedTruchetPath = null;
+        function truchetPath() {
+            if (cachedTruchetPath !== null) return cachedTruchetPath;
+            const n = TRUCHET.tiles;
+            let state = 51977;
+            function coins() {
+                const b = [];
+                for (let k = 0; k < n; k++) {
+                    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+                    b.push(state >>> 31);                 // the high bit: an LCG's low bits cycle
+                }
+                return b;
+            }
+            // rising[i + j]: 0 = upper right, 1 = lower left; falling[i - j]: 0 = upper left, 1 = lower
+            // right. Both 0 ink the top half, both 1 the bottom; otherwise the right (falling = 1) or left.
+            const rising = coins(), falling = coins();
+            let d = '';
+            for (let y = 0; y < 2 * n; y++) {
+                let run = -1;
+                for (let x = 0; x <= 2 * n; x++) {
+                    let inked = false;
+                    if (x < 2 * n) {
+                        const i = x >> 1, j = y >> 1;
+                        const a = rising[(i + j) % n], b = falling[(i - j + n) % n];
+                        inked = a === b ? (y & 1) === a : (x & 1) === b;
+                    }
+                    if (inked && run < 0) run = x;
+                    if (!inked && run >= 0) { d += 'M' + run + ' ' + y + 'h' + (x - run) + 'v1h-' + (x - run) + 'z'; run = -1; }
+                }
+            }
+            cachedTruchetPath = d;
+            return d;
         }
 
         // Penrose tiling (rhombus P3) has no repeating tile, so CSS gradients can't draw it: it is drawn
