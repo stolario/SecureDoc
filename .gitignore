@@ -1,0 +1,21 @@
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local scratch / sample documents
+*.sdoc
+# ...except the compatibility samples in testdata/
+!testdata/*.sdoc
+
+# Scratch files from test runs (kept inside the project)
+tmp/
+
+# Personal Claude Code settings
+.claude/settings.local.json

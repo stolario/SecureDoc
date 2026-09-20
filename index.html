@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureDoc</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/secure-document-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/secure-document-32.png">
+    <link rel="apple-touch-icon" href="icons/secure-document-256.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Setup: open / create / import ── -->
+<div id="setup-view" class="view">
+    <div class="card">
+        <div class="brand">
+            <img class="brand-mark" src="icons/secure-document-32.png" width="20" height="20" alt=""
+                 srcset="icons/secure-document-32.png 1.6x, icons/secure-document-256.png 12.8x">
+            <h1 class="brand-name">SecureDoc</h1>
+            <span class="brand-build">build 47</span>
+        </div>
+        <div class="rule brand-rule"></div>
+
+        <div class="tabs" role="tablist" aria-label="Document">
+            <button class="tab active" id="tab-btn-open" role="tab" aria-selected="true" aria-controls="tab-open" type="button">Open</button>
+            <button class="tab" id="tab-btn-new" role="tab" aria-selected="false" aria-controls="tab-new" tabindex="-1" type="button">Create</button>
+            <button class="tab" id="tab-btn-import" role="tab" aria-selected="false" aria-controls="tab-import" tabindex="-1" type="button">Import</button>
+        </div>
+        <div class="rule"></div>
+
+        <div id="tab-open" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-open">
+            <h2 class="panel-title">Open a document</h2>
+            <p class="panel-sub">Encrypted rich-text documents. One file, a 12-word passphrase.</p>
+            <div class="phrase-field">
+                <div class="field-head">
+                    <label for="open-phrase">Passphrase</label>
+                    <span id="open-count" class="word-count">0/12</span>
+                </div>
+                <textarea id="open-phrase" class="phrase" rows="3" placeholder="ocean  marble  drift  …"
+                          spellcheck="false" autocomplete="off" aria-describedby="open-count setup-error"></textarea>
+                <div class="word-bars" aria-hidden="true"></div>
+            </div>
+            <div class="field-msg">
+                <p id="setup-busy" class="busy" hidden></p>
+                <p id="setup-error" class="field-error" role="alert" hidden></p>
+            </div>
+            <input type="file" id="open-file" accept=".sdoc" class="file-input">
+            <label for="open-file" class="drop-zone">
+                <span class="file-badge" aria-hidden="true">sdoc</span>
+                <span class="drop-text">
+                    <span class="drop-title">Drop a .sdoc file here</span>
+                    <span class="drop-hint">or <span class="link">choose on disk</span> — it opens right away</span>
+                </span>
+            </label>
+            <div class="action-row">
+                <button id="open-btn" class="quiet" type="button">Open</button>
+                <span class="trust">AES-256 · local</span>
+            </div>
+        </div>
+
+        <div id="tab-new" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-new" hidden>
+            <h2 class="panel-title">Create a document</h2>
+            <p class="panel-sub">An empty page, sealed with a 12-word passphrase. Nothing is written to disk until you save.</p>
+            <label for="new-title" class="field-label">Title</label>
+            <input type="text" id="new-title" class="text-field" placeholder="New document" autocomplete="off">
+            <div class="phrase-field">
+                <div class="field-head">
+                    <label for="new-phrase">Passphrase</label>
+                    <span class="field-tools">
+                        <button id="gen-btn" class="link-btn" type="button">Generate</button>
+                        <span id="new-count" class="word-count">0/12</span>
+                    </span>
+                </div>
+                <textarea id="new-phrase" class="phrase" rows="3" placeholder="ocean  marble  drift  …"
+                          spellcheck="false" autocomplete="off" aria-describedby="new-count setup-error"></textarea>
+                <div class="word-bars" aria-hidden="true"></div>
+            </div>
+            <p class="warn" id="phrase-warn" hidden>Write these 12 words down. They cannot be recovered.</p>
+            <div class="field-msg"></div>
+            <div class="action-row">
+                <button id="create-btn" class="primary" type="button">Create</button>
+                <span class="trust">AES-256 · local</span>
+            </div>
+        </div>
+
+        <div id="tab-import" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-import" hidden>
+            <h2 class="panel-title">Import a Word document</h2>
+            <p class="panel-sub">DOCX with formatting, tables and images, sealed with a 12-word passphrase.</p>
+            <div class="phrase-field">
+                <div class="field-head">
+                    <label for="import-phrase">Passphrase</label>
+                    <span class="field-tools">
+                        <button id="import-gen" class="link-btn" type="button">Generate</button>
+                        <span id="import-count" class="word-count">0/12</span>
+                    </span>
+                </div>
+                <textarea id="import-phrase" class="phrase" rows="3" placeholder="ocean  marble  drift  …"
+                          spellcheck="false" autocomplete="off" aria-describedby="import-count setup-error"></textarea>
+                <div class="word-bars" aria-hidden="true"></div>
+            </div>
+            <div class="field-msg"></div>
+            <input type="file" id="import-file" accept=".docx" class="file-input">
+            <label for="import-file" class="drop-zone">
+                <span class="file-badge" aria-hidden="true">docx</span>
+                <span class="drop-text">
+                    <span class="drop-title">Drop a .docx file here</span>
+                    <span class="drop-hint">or <span class="link">choose on disk</span> — it imports right away</span>
+                </span>
+            </label>
+            <div class="action-row">
+                <button id="import-btn" class="quiet" type="button">Import</button>
+                <span class="trust">AES-256 · local</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Editor ── -->
+<div id="editor-view" class="view" hidden>
+    <div class="toolbar">
+        <select id="font-size" class="tb-select" title="Font size in points — applies to the selection (Ctrl+] / Ctrl+[ — larger/smaller)">
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+            <option value="14">14</option>
+            <option value="16">16</option>
+            <option value="18">18</option>
+            <option value="20">20</option>
+            <option value="24">24</option>
+            <option value="28">28</option>
+            <option value="36">36</option>
+            <option value="48">48</option>
+            <option value="72">72</option>
+        </select>
+        <span class="sep"></span>
+        <button data-cmd="bold" title="Bold (Ctrl+B)" type="button"><b>B</b></button>
+        <button data-cmd="italic" title="Italic (Ctrl+I)" type="button"><i>I</i></button>
+        <button data-cmd="underline" title="Underline (Ctrl+U)" type="button"><u>U</u></button>
+        <button id="clear-fmt" title="Clear formatting of the selected text — links, colour, font, headings (Ctrl+Space)" type="button">T✕</button>
+        <span class="sep"></span>
+        <button data-cmd="justifyLeft" title="Align left" type="button">◧</button>
+        <button data-cmd="justifyCenter" title="Align centre" type="button">▤</button>
+        <button data-cmd="justifyRight" title="Align right" type="button">◨</button>
+        <span class="sep"></span>
+        <button data-cmd="outdent" title="Decrease indent" type="button">⇤</button>
+        <button data-cmd="indent" title="Increase indent" type="button">⇥</button>
+        <span class="sep"></span>
+        <button id="tbl-btn" title="Insert table" type="button">▦</button>
+        <span id="table-ops" hidden>
+            <button id="row-add" type="button" title="Add a row below">+row</button>
+            <button id="row-del" type="button" title="Delete the row">−row</button>
+            <button id="col-add" type="button" title="Add a column to the right">+col</button>
+            <button id="col-del" type="button" title="Delete the column">−col</button>
+            <button id="cell-fill" type="button" title="Fill colour — for the selected cells or the cell with the caret">
+                <span>Fill</span><span id="fill-swatch" class="fill-swatch"></span>
+            </button>
+        </span>
+        <button id="img-btn" title="Insert image" type="button">🖼</button>
+        <button id="div-btn" title="Insert a section divider" type="button" aria-haspopup="true">⁂<span class="tb-caret">▾</span></button>
+        <input type="file" id="img-input" accept="image/*" hidden>
+        <span class="spacer"></span>
+        <span id="status" class="status"></span>
+        <button id="save-btn" class="icon-btn" aria-label="Save" title="Save (Ctrl+S) — the location is asked for once; Ctrl+Shift+S — Save as…" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span id="dirty-mark" class="dirty-mark" hidden>*</span>
+        </button>
+        <button id="pdf-btn" title="Download as PDF" type="button">PDF</button>
+        <button id="pw-btn" class="icon-btn" aria-label="Change passphrase" title="Change passphrase" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3"/><path d="m16 7 3 3"/><path d="m18.5 4.5 2 2"/></svg>
+        </button>
+        <button id="bg-btn" class="icon-btn" aria-label="Background" title="Background colour around the page" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 2.5v19a9.5 9.5 0 0 0 0-19z" fill="currentColor"/></svg>
+        </button>
+        <button id="close-btn" class="icon-btn" aria-label="Close" title="Close the document" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        </button>
+    </div>
+    <div class="page-wrap">
+        <div id="editor" class="editor" contenteditable="true" spellcheck="true"></div>
+    </div>
+</div>
+
+<!-- ── Table size picker ── -->
+<div id="table-picker" hidden>
+    <div id="table-grid"></div>
+    <div id="table-grid-label">1 × 1</div>
+</div>
+
+<!-- ── Section divider picker ── -->
+<div id="div-picker" hidden>
+    <div class="div-grid">
+        <button type="button" class="div-opt" data-symbol="⁂" title="Asterism">⁂</button>
+        <button type="button" class="div-opt" data-symbol="❖" title="Diamond">❖</button>
+        <button type="button" class="div-opt" data-symbol="✦" title="Four-pointed star">✦</button>
+        <button type="button" class="div-opt" data-symbol="✧" title="Open four-pointed star">✧</button>
+        <button type="button" class="div-opt" data-symbol="❦" title="Fleuron">❦</button>
+        <button type="button" class="div-opt" data-symbol="❧" title="Rotated fleuron">❧</button>
+        <button type="button" class="div-opt" data-symbol="☙" title="Reversed fleuron">☙</button>
+        <button type="button" class="div-opt" data-symbol="✤" title="Ornate clover">✤</button>
+        <button type="button" class="div-opt" data-symbol="✥" title="Ornate cross">✥</button>
+        <button type="button" class="div-opt" data-symbol="❈" title="Ornate asterisk">❈</button>
+        <button type="button" class="div-opt" data-symbol="❉" title="Balloon asterisk">❉</button>
+        <button type="button" class="div-opt" data-symbol="✻" title="Six-petal asterisk">✻</button>
+    </div>
+    <div class="div-grid div-wide">
+        <button type="button" class="div-opt" data-symbol="❦ ❦ ❦" title="Three fleurons">❦ ❦ ❦</button>
+        <button type="button" class="div-opt" data-symbol="✦ ✦ ✦" title="Three stars">✦ ✦ ✦</button>
+        <button type="button" class="div-opt" data-symbol="⸙ — ⸙" title="Two leaves around a dash">⸙ — ⸙</button>
+        <button type="button" class="div-opt" data-symbol="— ❖ —" title="Diamond between dashes">— ❖ —</button>
+    </div>
+</div>
+
+<!-- ── Background around the page: colour + pattern ── -->
+<div id="bg-picker" hidden>
+    <div class="fp-caption">Colour</div>
+    <button type="button" class="bg-opt" data-bg="black"><span class="bg-chip"></span>Black</button>
+    <button type="button" class="bg-opt" data-bg="navy"><span class="bg-chip"></span>Dark blue</button>
+    <button type="button" class="bg-opt" data-bg="darkgrey"><span class="bg-chip"></span>Dark grey</button>
+    <button type="button" class="bg-opt" data-bg="grey"><span class="bg-chip"></span>Grey</button>
+    <button type="button" class="bg-opt" data-bg="sepia"><span class="bg-chip"></span>Sepia</button>
+    <button type="button" class="bg-opt" data-bg="white"><span class="bg-chip"></span>White</button>
+    <div class="fp-caption">Pattern</div>
+    <div class="bg-pat-groups">
+        <div class="bg-pat-grid">
+            <button type="button" class="bg-pat" data-pattern="none" title="None"><span class="bg-pat-chip"></span>None</button>
+            <button type="button" class="bg-pat" data-pattern="dots" title="Dots"><span class="bg-pat-chip"></span>Dots</button>
+            <button type="button" class="bg-pat" data-pattern="grid" title="Grid"><span class="bg-pat-chip"></span>Grid</button>
+            <button type="button" class="bg-pat" data-pattern="lines" title="Lines"><span class="bg-pat-chip"></span>Lines</button>
+            <button type="button" class="bg-pat" data-pattern="diagonal" title="Diagonal"><span class="bg-pat-chip"></span>Diagonal</button>
+            <button type="button" class="bg-pat" data-pattern="waves" title="Waves"><span class="bg-pat-chip"></span>Waves</button>
+            <button type="button" class="bg-pat" data-pattern="octagons" title="Octagon and square tiling"><span class="bg-pat-chip"></span>Octagons</button>
+        </div>
+        <div class="bg-pat-grid bg-pat-irregular">
+            <button type="button" class="bg-pat" data-pattern="penrose" title="Penrose tiling"><span class="bg-pat-chip"></span>Penrose</button>
+            <button type="button" class="bg-pat" data-pattern="voronoi" title="Irregular Voronoi mosaic"><span class="bg-pat-chip"></span>Voronoi</button>
+            <button type="button" class="bg-pat" data-pattern="truchet"
+                    title="Truchet tiles: half-inked squares turned by their diagonals"><span class="bg-pat-chip"></span>Truchet</button>
+        </div>
+        <div class="bg-pat-grid bg-pat-illusions">
+            <button type="button" class="bg-pat" data-pattern="cubes"
+                    title="Reversible cubes: seen from above, then from below"><span class="bg-pat-chip"></span>Cubes</button>
+            <button type="button" class="bg-pat" data-pattern="zollner"
+                    title="Zöllner illusion: the diagonals are parallel"><span class="bg-pat-chip"></span>Zöllner</button>
+            <button type="button" class="bg-pat" data-pattern="cafe-wall"
+                    title="Café wall illusion: the mortar lines are straight and parallel"><span class="bg-pat-chip"></span>Café wall</button>
+            <button type="button" class="bg-pat" data-pattern="kanizsa"
+                    title="Kanizsa squares: edges that are not drawn"><span class="bg-pat-chip"></span>Kanizsa</button>
+        </div>
+    </div>
+    <div class="fp-caption">Animated</div>
+    <div class="bg-pat-grid">
+        <button type="button" class="bg-pat" data-pattern="penrose-swap" aria-label="Animated Penrose"
+                title="Penrose tiling whose two greys trade places"><span class="bg-pat-chip"></span>Penrose</button>
+        <button type="button" class="bg-pat" data-pattern="cubes-flip" aria-label="Animated cubes"
+                title="Cubes that turn inside out as the light moves"><span class="bg-pat-chip"></span>Cubes</button>
+    </div>
+    <!-- Shown by CSS alone, only where the system asks for reduced motion — which is why the
+         tiling would be standing still. -->
+    <p class="motion-note">This computer asks for reduced motion, so these are held still. Turn
+        animation effects back on in the system settings to see them move.</p>
+</div>
+
+<!-- ── Cell fill colour picker ── -->
+<div id="fill-picker" hidden>
+    <div id="fp-palette" class="fp-grid"></div>
+    <div id="fp-recent-wrap">
+        <div class="fp-caption">Recent</div>
+        <div id="fp-recent" class="fp-grid"></div>
+    </div>
+    <div class="fp-caption">Exact colour</div>
+    <div id="fp-sv" title="Saturation (←→) and brightness (↑↓)"><div id="fp-sv-knob" class="fp-knob"></div></div>
+    <div id="fp-hue" title="Hue"><div id="fp-hue-knob" class="fp-knob"></div></div>
+    <div class="fp-fields">
+        <span id="fp-preview"></span>
+        <input type="text" id="fp-hex" maxlength="7" placeholder="#rrggbb" spellcheck="false" autocomplete="off" title="HEX">
+        <label class="fp-num">R<input type="number" id="fp-r" min="0" max="255"></label>
+        <label class="fp-num">G<input type="number" id="fp-g" min="0" max="255"></label>
+        <label class="fp-num">B<input type="number" id="fp-b" min="0" max="255"></label>
+        <input type="color" id="fp-native" title="System colour picker">
+    </div>
+    <div class="fp-actions">
+        <button id="fp-none" type="button">No fill</button>
+        <button id="fp-done" type="button">Done</button>
+    </div>
+</div>
+
+<!-- ── Change-password dialog ── -->
+<dialog id="pw-dialog">
+    <h3>Change passphrase</h3>
+    <label for="pw-old">Current 12 words</label>
+    <textarea id="pw-old" rows="2" spellcheck="false" autocomplete="off"></textarea>
+    <label for="pw-new">New 12 words</label>
+    <div class="phrase-row">
+        <button id="pw-gen" class="secondary" type="button">Generate</button>
+    </div>
+    <textarea id="pw-new" rows="2" spellcheck="false" autocomplete="off"></textarea>
+    <p class="muted">The new passphrase takes effect on the next save.</p>
+    <div id="pw-error" class="banner error" hidden></div>
+    <menu>
+        <button id="pw-cancel" class="secondary" type="button">Cancel</button>
+        <button id="pw-apply" class="primary" type="button">Change</button>
+    </menu>
+</dialog>
+
+<script src="js/wordlist.js"></script>
+<script src="js/passphrase.js"></script>
+<script src="js/vendor/hash-wasm-argon2-4.12.0.umd.min.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/sdoc.js"></script>
+<script src="js/import.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
