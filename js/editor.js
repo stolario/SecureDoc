@@ -669,6 +669,10 @@ window.Editor = (function () {
     }
 
     // ── table editing (operates on the cell containing the caret) ──
+    // A selection of cells often does not start inside one: a drag begun in the text above the
+    // table, Ctrl+A, or whole cells selected (the range then starts at the <tr>). Fall back to the
+    // first cell the selection touches — otherwise the table buttons, Fill among them, vanish just
+    // when cells have been selected to act on.
     function currentCell() {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) return null;
@@ -677,7 +681,7 @@ window.Editor = (function () {
             if (n.nodeType === 1 && (n.tagName === 'TD' || n.tagName === 'TH')) return n;
             n = n.parentNode;
         }
-        return null;
+        return cellsTouchedBy(liveRanges())[0] || null;
     }
 
     function inTable() {
@@ -689,13 +693,24 @@ window.Editor = (function () {
     // per-cell ranges Firefox makes), else the one holding the caret. Falls back to the remembered
     // range, since the colour picker's inputs take focus away from the editor.
     function selectedCells() {
+        const ranges = liveRanges();
+        if (!ranges.length && lastRange && el.contains(lastRange.commonAncestorContainer)) ranges.push(lastRange);
+        return cellsTouchedBy(ranges);
+    }
+
+    // The selection's ranges that lie in the editor.
+    function liveRanges() {
         const sel = window.getSelection();
         const ranges = [];
         for (let i = 0; sel && i < sel.rangeCount; i++) {
             const r = sel.getRangeAt(i);
             if (el.contains(r.commonAncestorContainer)) ranges.push(r);
         }
-        if (!ranges.length && lastRange && el.contains(lastRange.commonAncestorContainer)) ranges.push(lastRange);
+        return ranges;
+    }
+
+    function cellsTouchedBy(ranges) {
+        if (!ranges.length) return [];
         const cells = Array.prototype.filter.call(el.querySelectorAll('td,th'), function (c) {
             return ranges.some(function (r) { return r.intersectsNode(c); });
         });
