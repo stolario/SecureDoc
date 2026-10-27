@@ -1,0 +1,15 @@
+# Normalize text files to LF in the repository.
+* text=auto eol=lf
+
+# Binary files git must not touch.
+*.sdoc binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.docx binary
+
+# Vendored minified builds: keep the bytes exactly as released (their SHA-256 is in js/vendor/SHA256SUMS).
+js/vendor/** -text
+
+# Windows batch scripts must stay CRLF.
+*.bat text eol=crlf
