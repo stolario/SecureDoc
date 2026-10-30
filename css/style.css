@@ -73,7 +73,7 @@ body { isolation: isolate; }
 
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark { flex: none; display: block; width: 20px; height: 20px; }
-.brand-name { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.brand-name { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
 .brand-build {
     margin-left: auto;
     flex: none;
@@ -102,7 +102,7 @@ body { isolation: isolate; }
 .tab.active { border-bottom-color: var(--s-accent); color: var(--s-ink); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--s-link); outline-offset: -2px; }
 
-.panel-title { margin: 32px 0 8px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.panel-title { margin: 32px 0 8px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
 .panel-sub { margin: 0; max-width: 44ch; font-size: 15px; line-height: 1.5; color: var(--s-ink-2); }
 
 #setup-view .field-label,
@@ -241,7 +241,8 @@ body { isolation: isolate; }
 @media (max-width: 520px) {
     #setup-view { padding: 16px; }
     .card { padding: 28px 22px; }
-    .panel-title { margin-top: 26px; font-size: 23px; }
+    .brand-name { font-size: 23px; }
+    .panel-title { margin-top: 26px; }
 }
 
 label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }

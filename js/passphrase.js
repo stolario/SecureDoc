@@ -27,12 +27,14 @@ window.Passphrase = (function () {
         return c ? c.split(' ').length : 0;
     }
 
-    // Checks a phrase the user is choosing (create / import / change password): exactly 12 words, all
-    // from the dictionary. Returns an error message, or null if it is fine. Opening a file is not
-    // checked this way — older documents may be sealed under phrases chosen before this rule.
+    // Checks an optional phrase the user is choosing (create / import / change password). An empty
+    // phrase deliberately means "no protection"; otherwise it must be exactly 12 dictionary words.
+    // Returns an error message, or null if it is fine. Opening a file is not checked this way — older
+    // documents may be sealed under phrases chosen before this rule.
     const WORD_SET = new Set(WORDS);
     function validate(phrase) {
         const c = canonical(phrase);
+        if (!c) return null;
         const words = c ? c.split(' ') : [];
         if (words.length !== COUNT) {
             return 'Exactly ' + COUNT + ' dictionary words are needed (now ' + words.length + '). '

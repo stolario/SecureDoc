@@ -20,6 +20,7 @@ window.Editor = (function () {
         el = editorEl;
         setupImageResize();
         setupTabKey();
+        setupQuoteExit();
         setupPaste();
         setupCaretMemory();
     }
@@ -87,6 +88,29 @@ window.Editor = (function () {
                 && node.nodeValue.charAt(range.startOffset - 1) === '\t') {
             document.execCommand('delete');
         }
+    }
+
+    // Chrome continues an empty blockquote as another blockquote, so a document can end up with no
+    // keyboard route back to ordinary body text. Keep the familiar two-Enter behaviour: the first
+    // Enter creates an empty quote line; Enter on that empty line replaces it with a plain paragraph.
+    function setupQuoteExit() {
+        el.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+            const quote = blockAt(sel.getRangeAt(0).startContainer);
+            if (!quote || quote.tagName !== 'BLOCKQUOTE') return;
+            const text = quote.textContent.replace(/\u200b/g, '').trim();
+            if (text || quote.querySelector('img,table,hr,math')) return;
+
+            e.preventDefault();
+            const paragraph = document.createElement('p');
+            paragraph.appendChild(document.createElement('br'));
+            quote.parentNode.insertBefore(paragraph, quote.nextSibling);
+            quote.remove();
+            caretInto(paragraph, true);
+            fireInput();
+        });
     }
 
     // ── paste sanitizing ──

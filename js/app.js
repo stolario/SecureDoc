@@ -288,7 +288,7 @@
         setupError(null);
         const t = $('new-title').value.trim() || 'New document';
         const phrase = Passphrase.canonical($('new-phrase').value);
-        const bad = phrase ? Passphrase.validate(phrase) : null;
+        const bad = Passphrase.validate(phrase);
         if (bad) return setupError(bad);
         passphrase = phrase;
         title = t;
@@ -306,7 +306,7 @@
     async function importDocx(file) {
         setupError(null);
         const phrase = Passphrase.canonical($('import-phrase').value);
-        const bad = phrase ? Passphrase.validate(phrase) : null;
+        const bad = Passphrase.validate(phrase);
         if (bad) {
             setupError(bad);
             return false;
@@ -1564,7 +1564,7 @@
         const oldP = Passphrase.canonical($('pw-old').value);
         const newP = Passphrase.canonical($('pw-new').value);
         if (oldP !== (passphrase || '')) return pwError('The current passphrase is wrong.');
-        const bad = newP ? Passphrase.validate(newP) : null;
+        const bad = Passphrase.validate(newP);
         if (bad) return pwError(bad);
         const wasDirty = dirty;
         const wasPendingPassword = pendingPassword;
