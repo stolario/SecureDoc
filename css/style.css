@@ -72,8 +72,15 @@ body { isolation: isolate; }
 }
 
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { flex: none; display: block; width: 20px; height: 20px; }
-.brand-name { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.brand-mark { flex: none; display: block; width: 32px; height: 32px; }
+.brand-name {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    transform: translateY(-2px);
+}
 .brand-build {
     margin-left: auto;
     flex: none;
