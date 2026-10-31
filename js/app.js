@@ -9,6 +9,9 @@
     // Owned by the browser for the open document. The passphrase is kept in memory (never written to
     // disk) so re-encrypting on save needs no re-prompt; JS strings can't be zeroed like a char[].
     let passphrase = null;
+    // Changes whenever a different document/passphrase context is installed. Save caching uses this
+    // opaque number instead of retaining the passphrase inside a JSON cache key.
+    let secretVersion = 0;
     let title = 'New document';
     let createdAt = null;        // ISO instant from a decrypted/opened doc; null for a fresh one
     let docName = 'untitled.sdoc';
@@ -177,10 +180,19 @@
     // content has nothing to lose (opened from disk, or a fresh empty doc) — an import does.
     function openInEditor(clean) {
         showView('editor');
+        clearSecretInputs();
         showFontSize();
         pendingPassword = false;
         savedContent = clean ? Editor.serialize() : null;
         setDirty(!clean);
+    }
+
+    function clearSecretInputs() {
+        ['open-phrase', 'new-phrase', 'import-phrase', 'pw-old', 'pw-new'].forEach(function (id) {
+            const field = $(id);
+            field.value = '';
+            field.dispatchEvent(new Event('input'));
+        });
     }
 
     // ── file zones (open / import) ──
@@ -260,6 +272,7 @@
             setBusy('Opening the document…');
             const doc = await Sdoc.decode(file, phrase);
             passphrase = phrase;
+            secretVersion++;
             title = doc.title || file.name.replace(/\.sdoc$/i, '');
             createdAt = doc.createdAt || null;
             docName = toDocName(file.name);
@@ -291,6 +304,7 @@
         const bad = Passphrase.validate(phrase);
         if (bad) return setupError(bad);
         passphrase = phrase;
+        secretVersion++;
         title = t;
         createdAt = null;
         docName = toDocName(t);
@@ -315,6 +329,7 @@
             setBusy('Importing the document…');
             const doc = await Importer.importFile(file, file.name);
             passphrase = phrase;
+            secretVersion++;
             title = doc.title || file.name.replace(/\.[^.]+$/, '');
             createdAt = null;
             docName = toDocName(title);
@@ -1440,7 +1455,7 @@
     async function saveNow() {
         if (passphrase === null) return false;
         const content = Editor.serialize();
-        const key = JSON.stringify([passphrase, title, content]);
+        const key = JSON.stringify([secretVersion, title, content]);
         let blob;
         if (ready && ready.key === key) {
             blob = ready.blob;
@@ -1569,6 +1584,7 @@
         const wasDirty = dirty;
         const wasPendingPassword = pendingPassword;
         passphrase = newP;
+        secretVersion++;
         Sdoc.prepare(newP);
         pendingPassword = true;
         setDirty(true);
@@ -1586,6 +1602,7 @@
         } else {
             ready = null;
             passphrase = oldP;
+            secretVersion++;
             Sdoc.prepare(oldP);
             pendingPassword = wasPendingPassword;
             setDirty(wasDirty);
@@ -1608,7 +1625,10 @@
             }
         }
         passphrase = null;
+        secretVersion++;
         Sdoc.forget();
+        ready = null;
+        clearSecretInputs();
         clearTimeout(dirtyCheck);
         setDirty(false); // nothing is open any more — no unload prompt on the setup screen
         savedContent = null;
