@@ -1627,8 +1627,6 @@
         if (dirty) {
             if (confirm('Save changes before closing?')) {
                 if (!await saveNow()) return; // saveNow() already showed why; keep the document open
-            } else if (!confirm('Close without saving? The changes will be lost for good.')) {
-                return;
             }
         }
         passphrase = null;
