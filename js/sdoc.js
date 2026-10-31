@@ -365,6 +365,14 @@ window.Sdoc = (function () {
         return null;
     }
 
+    // Valid legacy/third-party files may still be substantially cheaper to brute-force than files
+    // SecureDoc creates today. Keep them readable, but tell the caller to migrate them on next save.
+    function kdfNeedsUpgrade(kdf) {
+        return kdf.salt.length < SALT_LENGTH
+            || kdf.memoryKiB < DEFAULT_KDF.memoryKiB
+            || kdf.iterations < DEFAULT_KDF.iterations;
+    }
+
     // ── public API ──
 
     /**
@@ -420,6 +428,7 @@ window.Sdoc = (function () {
      */
     async function decode(blob, passphrase) {
         const sealed = readFile(new Uint8Array(await blob.arrayBuffer()));
+        const needsKdfUpgrade = sealed.encrypted && kdfNeedsUpgrade(sealed.kdf);
         let container;
         if (!sealed.encrypted) {
             container = sealed.body;
@@ -472,6 +481,7 @@ window.Sdoc = (function () {
             createdAt: typeof m.createdAt === 'string' ? m.createdAt : epoch,
             modifiedAt: typeof m.modifiedAt === 'string' ? m.modifiedAt : epoch,
             caret: Number.isInteger(m.caret) && m.caret >= 0 ? m.caret : null,
+            needsKdfUpgrade: needsKdfUpgrade,
             media: media
         };
     }

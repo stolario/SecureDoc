@@ -40,6 +40,7 @@
     // so typing and then undoing back to the saved text clears it again.
     let savedContent = null;     // Editor.serialize() as last saved / opened; null = not on disk yet
     let pendingPassword = false; // true only while a passphrase change is being saved
+    let needsKdfUpgrade = false; // weak legacy KDF: the next save migrates it to today's profile
     let dirtyCheck = 0;
 
     function setDirty(v) {
@@ -55,7 +56,7 @@
     }
     function recheckDirty() {
         if ($('editor-view').hidden) return;
-        const changed = pendingPassword || Editor.serialize() !== savedContent;
+        const changed = pendingPassword || needsKdfUpgrade || Editor.serialize() !== savedContent;
         if (!changed && dirty) status('');
         setDirty(changed);
     }
@@ -63,6 +64,7 @@
     function markSaved(content) {
         savedContent = content;
         pendingPassword = false;
+        needsKdfUpgrade = false;
         recheckDirty();
     }
 
@@ -184,7 +186,7 @@
         showFontSize();
         pendingPassword = false;
         savedContent = clean ? Editor.serialize() : null;
-        setDirty(!clean);
+        setDirty(!clean || needsKdfUpgrade);
     }
 
     function clearSecretInputs() {
@@ -275,6 +277,7 @@
             secretVersion++;
             title = doc.title || file.name.replace(/\.sdoc$/i, '');
             createdAt = doc.createdAt || null;
+            needsKdfUpgrade = !!doc.needsKdfUpgrade;
             docName = toDocName(file.name);
             fileHandle = null; // <input type=file> gives no writable handle: first save asks where
             Sdoc.prepare(phrase);
@@ -282,7 +285,9 @@
             Editor.load(doc.content);
             openInEditor(true);
             Editor.restoreCaret(doc.caret); // back where the caret was at the last save
-            status('Opened');
+            status(needsKdfUpgrade
+                ? 'Opened — weak legacy encryption settings; save to upgrade them'
+                : 'Opened');
             return true;
         } catch (e) {
             setupError(e.code === 'wrong_password'
@@ -307,6 +312,7 @@
         secretVersion++;
         title = t;
         createdAt = null;
+        needsKdfUpgrade = false;
         docName = toDocName(t);
         fileHandle = null;
         Sdoc.prepare(phrase);
@@ -332,6 +338,7 @@
             secretVersion++;
             title = doc.title || file.name.replace(/\.[^.]+$/, '');
             createdAt = null;
+            needsKdfUpgrade = false;
             docName = toDocName(title);
             fileHandle = null;
             Sdoc.prepare(phrase);
@@ -1632,6 +1639,7 @@
         clearTimeout(dirtyCheck);
         setDirty(false); // nothing is open any more — no unload prompt on the setup screen
         savedContent = null;
+        needsKdfUpgrade = false;
         createdAt = null;
         title = 'New document';
         docName = 'untitled.sdoc';
