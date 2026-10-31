@@ -98,19 +98,39 @@ window.Editor = (function () {
             if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
-            const quote = blockAt(sel.getRangeAt(0).startContainer);
-            if (!quote || quote.tagName !== 'BLOCKQUOTE') return;
-            const text = quote.textContent.replace(/\u200b/g, '').trim();
-            if (text || quote.querySelector('img,table,hr,math')) return;
+            const range = sel.getRangeAt(0);
+            const quote = closestElement(range.startContainer, 'BLOCKQUOTE');
+            if (!quote || !el.contains(quote)) return;
+
+            // A quote loaded from HTML commonly contains several <p>/<div> children. In that shape
+            // the empty line is only one child; testing quote.textContent sees the earlier paragraphs
+            // and makes the caret impossible to escape. Find the direct child holding the caret and
+            // test/remove that line alone.
+            let line = range.startContainer;
+            while (line && line !== quote && line.parentNode !== quote) line = line.parentNode;
+            if (!line || line === quote) line = quote;
+            const text = line.textContent.replace(/\u200b/g, '').trim();
+            if (text || (line.querySelector && line.querySelector('img,table,hr,math'))) return;
 
             e.preventDefault();
             const paragraph = document.createElement('p');
             paragraph.appendChild(document.createElement('br'));
             quote.parentNode.insertBefore(paragraph, quote.nextSibling);
-            quote.remove();
+            if (line !== quote) line.remove();
+            const quoteText = quote.textContent.replace(/\u200b/g, '').trim();
+            if (line === quote || (!quoteText && !quote.querySelector('img,table,hr,math'))) quote.remove();
             caretInto(paragraph, true);
             fireInput();
         });
+    }
+
+    function closestElement(node, tagName) {
+        if (node && node.nodeType !== 1) node = node.parentElement;
+        while (node && node !== el) {
+            if (node.tagName === tagName) return node;
+            node = node.parentElement;
+        }
+        return null;
     }
 
     // ── paste sanitizing ──
