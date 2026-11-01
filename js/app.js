@@ -901,6 +901,13 @@
                 const tiling = penroseImage(ink, PENROSE_FILLS);
                 return tiling ? { image: 'url("' + tiling.url + '")', size: tiling.size } : { image: 'none', size: null };
             },
+            // A genuine substitution-generated patch of interlocking hats. Unlike a CSS tile made
+            // from a few loose outlines, the source patch has no gaps, overlaps or periodic repeat
+            // inside the image. It is intentionally large enough that its eventual CSS repeat stays
+            // outside the normal viewport.
+            einstein: function () {
+                return { image: 'url("icons/einstein-hat-tiling.png")', size: 1200 };
+            },
             // Animated: the same tiling as `penrose`, cross-fading with the copy that gives each kind
             // of rhombus the other's tone, so the two greys trade places — the light ones darken while
             // the dark ones lighten. The dividing lines are dark on every background (see lineVeil),

@@ -26,6 +26,10 @@ A modern browser is required (Chrome/Edge 109+, Firefox 113+, Safari 16.4+). In 
 Save asks for a location once and then overwrites the same file; in other browsers saving downloads
 the `.sdoc`.
 
+The Einstein hat background uses the `threefold.png` sample by David Smith, Joseph Samuel Myers,
+Craig S. Kaplan and Chaim Goodman-Strauss, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ## Usage
 
 1. **Create** — optionally click **Generate**, **write the 12 words down**, then click **Create**.
