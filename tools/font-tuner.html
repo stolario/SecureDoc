@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SecureDoc — Font tuner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  A development helper, not part of the app: open this file directly in a browser (double-click),
+  or at http://localhost:8637/tools/font-tuner.html while the local server runs.
+
+  Turn the knobs on the left, read the document on the right, then copy the CSS it prints at the
+  bottom of the panel into css/style.css. The preview reproduces the editor's own rules
+  (.editor, .editor p, headings, blockquote, tables, dividers, links), so what is tuned here is
+  what the real page will look like. Nothing here is loaded by index.html.
+-->
+<link rel="stylesheet" href="font-tuner.css">
+</head>
+<body>
+
+<header class="bar">
+    <h1>Font tuner <span class="sub">SecureDoc · editor typography</span></h1>
+    <div class="bar-actions">
+        <label class="inline"><input type="checkbox" id="opt-all"> print every property</label>
+        <select id="preset-pick" title="Ready-made starting points">
+            <option value="">preset…</option>
+        </select>
+        <button type="button" id="btn-reset" class="quiet">Reset to project</button>
+        <button type="button" id="btn-copy" class="primary">Copy CSS</button>
+    </div>
+</header>
+
+<main class="split">
+
+    <!-- ── controls ── -->
+    <section class="panel" id="controls">
+
+        <h2>Body text</h2>
+
+        <div class="ctl">
+            <label for="f-family">Font family</label>
+            <select id="f-family" data-var="family"></select>
+        </div>
+        <div class="ctl">
+            <label for="f-family-custom">…or write a stack</label>
+            <input type="text" id="f-family-custom" data-var="familyCustom"
+                   placeholder="e.g. &quot;Iowan Old Style&quot;, Georgia, serif">
+            <p class="hint">Only fonts installed on the reader's machine render — the app ships none.</p>
+        </div>
+
+        <div class="ctl" data-range>
+            <label for="f-size">Font size <output id="o-size"></output></label>
+            <input type="range" id="f-size" data-var="size" min="12" max="26" step="0.5">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-line">Line height <output id="o-line"></output></label>
+            <input type="range" id="f-line" data-var="line" min="1" max="2.4" step="0.05">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-letter">Letter spacing <output id="o-letter"></output></label>
+            <input type="range" id="f-letter" data-var="letter" min="-0.04" max="0.12" step="0.005">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-word">Word spacing <output id="o-word"></output></label>
+            <input type="range" id="f-word" data-var="word" min="-0.05" max="0.4" step="0.01">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-weight">Weight <output id="o-weight"></output></label>
+            <input type="range" id="f-weight" data-var="weight" min="100" max="900" step="25">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-para">Paragraph gap <output id="o-para"></output></label>
+            <input type="range" id="f-para" data-var="para" min="0" max="32" step="1">
+        </div>
+        <div class="ctl two">
+            <span>
+                <label for="f-align">Alignment</label>
+                <select id="f-align" data-var="align">
+                    <option value="left">left</option>
+                    <option value="justify">justify</option>
+                </select>
+            </span>
+            <span>
+                <label for="f-hyphens">Hyphenation</label>
+                <select id="f-hyphens" data-var="hyphens">
+                    <option value="manual">off (manual)</option>
+                    <option value="auto">auto</option>
+                </select>
+            </span>
+        </div>
+        <div class="ctl two">
+            <span>
+                <label for="f-ink">Text colour</label>
+                <input type="color" id="f-ink" data-var="ink">
+            </span>
+            <span>
+                <label for="f-page">Page colour</label>
+                <input type="color" id="f-page" data-var="page">
+            </span>
+        </div>
+        <div class="ctl">
+            <label for="f-link">Link colour</label>
+            <input type="color" id="f-link" data-var="link">
+        </div>
+        <div class="ctl">
+            <label class="inline"><input type="checkbox" id="f-smooth" data-var="smooth">
+                smooth antialiasing + optimizeLegibility</label>
+        </div>
+
+        <!-- ── squeezing and stretching the glyphs themselves ── -->
+        <h2>Glyph shape — narrow / wide, short / tall</h2>
+        <p class="hint" id="axis-report">checking which axes this family answers to…</p>
+
+        <!-- Chrome reads variation axes out of a font FILE, not out of an installed family, so a
+             variable font has to be handed to the page before any axis does anything. Roboto Flex
+             sits in tools/fonts/ and is loaded on startup; any other file can be picked here. -->
+        <div class="ctl">
+            <label for="f-font-file">Load another font file</label>
+            <input type="file" id="f-font-file" accept=".ttf,.otf,.woff2,.woff">
+            <p class="hint">An installed family gives Chrome no axes at all: only a font loaded
+                from a file does. A <code>.ttf</code>/<code>.otf</code> is read for its real axis
+                ranges; a <code>.woff2</code> is only probed. The file stays in this tab —
+                <strong>to use it in the app it has to be vendored into the project</strong>, and
+                the printed CSS then carries the <code>@font-face</code> for it.</p>
+            <p class="hint" id="font-file-note"></p>
+        </div>
+
+        <div class="ctl" data-range>
+            <label for="f-stretch">font-stretch <output id="o-stretch"></output></label>
+            <input type="range" id="f-stretch" data-var="stretch" min="50" max="200" step="1">
+            <p class="hint">Picks a real condensed/expanded face, or drives the <code>wdth</code>
+                axis of a variable font. Families with neither ignore it.</p>
+        </div>
+
+        <!-- One slider per axis the loaded font actually declares, built from its fvar table. -->
+        <div id="axis-list"></div>
+        <div class="ctl">
+            <label class="inline"><input type="checkbox" id="f-axes-on" data-var="axesOn">
+                write <code>font-variation-settings</code></label>
+        </div>
+
+        <h3 class="sub-head">Proportions — works on every font, this project's included</h3>
+        <div class="ctl" data-range>
+            <label for="f-scalex">Glyph width <output id="o-scalex"></output></label>
+            <input type="range" id="f-scalex" data-var="scaleX" min="0.5" max="2" step="0.01">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-scaley">Glyph height <output id="o-scaley"></output></label>
+            <input type="range" id="f-scaley" data-var="scaleY" min="0.5" max="2" step="0.01">
+        </div>
+        <div class="ctl">
+            <label class="inline"><input type="checkbox" id="f-pitch" data-var="keepPitch">
+                keep the line pitch when the glyphs grow taller</label>
+            <p class="hint">Without it a taller glyph drags its line spacing up with it and the
+                text only looks larger; with it the letters stretch while the lines stay where
+                they were.</p>
+        </div>
+        <p class="hint">This is a geometric stretch of the drawn outlines — stems thicken as the
+            glyph widens, which no typographer would call a true condensed face, but it is the only
+            thing that reshapes a font the machine merely has installed. Past roughly 0.85–1.2 it
+            starts to show. The text box is scaled back the other way, so the measure stays put; in
+            a <code>contenteditable</code> a transform can nudge the caret by a pixel or two.</p>
+        <div class="ctl" data-range>
+            <label for="f-xheight">font-size-adjust (x-height) <output id="o-xheight"></output></label>
+            <input type="range" id="f-xheight" data-var="xheight" min="0" max="0.7" step="0.01">
+            <p class="hint">0 = off. Holds the x-height steady when a fallback font steps in.</p>
+        </div>
+
+        <h2>Headings</h2>
+        <div class="ctl" data-range>
+            <label for="f-h1">H1 size <output id="o-h1"></output></label>
+            <input type="range" id="f-h1" data-var="h1" min="1" max="3" step="0.05">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-h2">H2 size <output id="o-h2"></output></label>
+            <input type="range" id="f-h2" data-var="h2" min="1" max="2.4" step="0.05">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-h3">H3 size <output id="o-h3"></output></label>
+            <input type="range" id="f-h3" data-var="h3" min="0.9" max="2" step="0.05">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-hweight">Heading weight <output id="o-hweight"></output></label>
+            <input type="range" id="f-hweight" data-var="hweight" min="400" max="900" step="25">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-hline">Heading line height <output id="o-hline"></output></label>
+            <input type="range" id="f-hline" data-var="hline" min="1" max="1.8" step="0.05">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-htrack">Heading tracking <output id="o-htrack"></output></label>
+            <input type="range" id="f-htrack" data-var="htrack" min="-0.05" max="0.06" step="0.005">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-hstretch">Heading font-stretch <output id="o-hstretch"></output></label>
+            <input type="range" id="f-hstretch" data-var="hstretch" min="50" max="200" step="1">
+        </div>
+        <div class="ctl">
+            <label for="f-hfamily">Heading family</label>
+            <select id="f-hfamily" data-var="hfamily"></select>
+            <p class="hint">“same as body” prints no rule.</p>
+        </div>
+
+        <h2>The page</h2>
+        <div class="ctl" data-range>
+            <label for="f-width">Page width <output id="o-width"></output></label>
+            <input type="range" id="f-width" data-var="width" min="560" max="1100" step="10">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-padv">Padding, top/bottom <output id="o-padv"></output></label>
+            <input type="range" id="f-padv" data-var="padv" min="16" max="120" step="2">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-padh">Padding, sides <output id="o-padh"></output></label>
+            <input type="range" id="f-padh" data-var="padh" min="16" max="140" step="2">
+        </div>
+        <div class="ctl" data-range>
+            <label for="f-print">Print size <output id="o-print"></output></label>
+            <input type="range" id="f-print" data-var="print" min="8" max="16" step="0.5">
+            <p class="hint">Used by “Download as PDF” (the <code>@media print</code> block).</p>
+        </div>
+
+        <h2>CSS for css/style.css</h2>
+        <pre id="out" class="out" tabindex="0"></pre>
+        <p class="hint" id="out-note"></p>
+    </section>
+
+    <!-- ── live preview: the real .editor rules, driven by the knobs ── -->
+    <section class="preview-wrap">
+        <div class="page-wrap">
+            <div class="editor" id="preview">
+                <div class="doc-scale" id="preview-inner">
+                    <h1>The Mosaic of Kalderesh</h1>
+                    <!-- The editor keeps white-space: pre-wrap, so these paragraphs must stay on
+                         one line each: an indented source line would show up as an indent. -->
+                    <p>A short document, kept here only to read the type: a paragraph long enough to show how the lines sit under one another, how wide the measure feels, and whether the spacing between words stays even when the text is justified. <a href="#">A link lives here</a>, and <b>bold</b> next to <i>italic</i> and <u>underline</u>, so their weights can be compared at this size.</p>
+                    <h2>Figures and punctuation</h2>
+                    <p>1,284 volumes — 37 of them pre-1800 — were catalogued between 09:40 and 17:05 on 14 November 2026; “curly quotes”, an em dash — like this — and an ellipsis… 0123456789 · ILil1 · O0Ø · rn/m.</p>
+                    <p class="doc-divider">* * *</p>
+                    <h3>A list and a quotation</h3>
+                    <ul>
+                        <li>First item, with a clause that runs on far enough to wrap onto a second line of its own.</li>
+                        <li>Second item.</li>
+                    </ul>
+                    <blockquote>Type that is set too tight reads as a wall; set too loose it reads as a ladder. The gap between the two is narrower than it looks.</blockquote>
+                    <table class="doc-table">
+                        <tr><td><b>Shelf</b></td><td><b>Volumes</b></td><td><b>Condition</b></td></tr>
+                        <tr><td>North gallery</td><td>412</td><td>good</td></tr>
+                        <tr><td>Reading room</td><td>87</td><td>fragile</td></tr>
+                    </table>
+                    <p>The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. Sphinx of black quartz, judge my vow.</p>
+                    <p>Съешь же ещё этих мягких французских булок, да выпей чаю. Широкая электрификация южных губерний даст мощный толчок подъёму сельского хозяйства.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script src="font-tuner.js"></script>
+</body>
+</html>

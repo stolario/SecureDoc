@@ -1,0 +1,257 @@
+/* Font tuner — a development helper. Two columns: the knobs, and a document that answers to them.
+   The preview's own rules are copies of the editor rules in css/style.css, with every tunable
+   value read from a CSS custom property so JS only has to set the property. */
+
+:root {
+    --bg: #f0f2f5;
+    --card: #ffffff;
+    --ink: #1f2328;
+    --muted: #6a737d;
+    --accent: #1e5ac8;
+    --border: #d5d9de;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+
+    /* ── the tunables (defaults = what css/style.css carries today) ── */
+    --t-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --t-size: 16px;
+    --t-line: 1.6;
+    --t-letter: 0em;
+    --t-word: 0em;
+    --t-weight: 400;
+    --t-para: 12px;
+    --t-align: left;
+    --t-hyphens: manual;
+    --t-ink: #1f2328;
+    --t-page: #ffffff;
+    --t-link: #2459c4;
+    --t-smoothing: auto;
+    --t-rendering: auto;
+
+    --t-stretch: 100%;
+    --t-axes: normal;
+    --t-scale-x: 1;
+    --t-scale-y: 1;
+    --t-pitch-fix: 1;
+    --t-xheight: none;
+
+    --t-h1: 2em;
+    --t-h2: 1.5em;
+    --t-h3: 1.17em;
+    --t-hweight: 700;
+    --t-hline: 1.2;
+    --t-htrack: 0em;
+    --t-hstretch: 100%;
+    --t-hfamily: inherit;
+
+    --t-width: 820px;
+    --t-padv: 64px;
+    --t-padh: 72px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── top bar ── */
+.bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+}
+
+.bar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+.bar .sub { margin-left: 8px; font-weight: 400; font-size: 12px; color: var(--muted); }
+.bar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+button {
+    font: inherit;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #f6f8fa;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+button:hover { background: #eef1f5; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: #17489f; }
+
+select, input[type=text] {
+    font: inherit;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+}
+
+.bar-actions select { width: auto; }
+.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.inline input { margin: 0; }
+
+/* ── layout ── */
+.split { flex: 1; display: flex; min-height: 0; }
+
+.panel {
+    flex: none;
+    width: 380px;
+    overflow: auto;
+    padding: 4px 18px 60px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+}
+
+.panel h2 {
+    margin: 26px 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.ctl { margin: 14px 0; }
+.ctl > label { display: block; margin: 0 0 5px; font-size: 13px; color: var(--muted); }
+.ctl[data-range] > label { display: flex; justify-content: space-between; align-items: baseline; }
+.ctl.two { display: flex; gap: 12px; }
+.ctl.two > span { flex: 1; }
+
+output { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+input[type=color] {
+    width: 100%;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.hint { margin: 5px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.hint code, .ctl code { font-family: var(--mono); font-size: 11.5px; }
+.hint.warn { color: #b3261e; }
+.hint.good { color: #1a7f37; }
+
+.out {
+    margin: 8px 0 0;
+    padding: 12px;
+    max-height: 420px;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre;
+    background: #f6f8fa;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+/* ── preview ── */
+.preview-wrap { flex: 1; min-width: 0; overflow: auto; }
+
+.page-wrap {
+    min-height: 100%;
+    padding: 28px 16px 80px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+/* These are the editor's rules from css/style.css, with the tunables substituted in. */
+.editor {
+    background: var(--t-page);
+    width: 100%;
+    max-width: var(--t-width);
+    min-height: 1000px;
+    padding: var(--t-padv) var(--t-padh);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+    outline: none;
+    color: var(--t-ink);
+    font-family: var(--t-family);
+    font-size: var(--t-size);
+    font-weight: var(--t-weight);
+    font-stretch: var(--t-stretch);
+    font-variation-settings: var(--t-axes);
+    font-size-adjust: var(--t-xheight);
+    /* --t-pitch-fix is the vertical glyph stretch when the line pitch is to be held steady, and 1
+       otherwise: dividing it out of the line height keeps the lines where they were while the
+       letters grow. */
+    line-height: calc(var(--t-line) / var(--t-pitch-fix));
+    letter-spacing: var(--t-letter);
+    word-spacing: var(--t-word);
+    text-align: var(--t-align);
+    hyphens: var(--t-hyphens);
+    -webkit-font-smoothing: var(--t-smoothing);
+    text-rendering: var(--t-rendering);
+    white-space: pre-wrap;
+    tab-size: 1.27cm;
+}
+
+/* The geometric squeeze sits on an inner layer so the page's own padding and border keep their
+   true size; the width is divided back out so the text still fills the measure. */
+.editor > .doc-scale {
+    transform: scale(var(--t-scale-x), var(--t-scale-y));
+    transform-origin: top left;
+    width: calc(100% / var(--t-scale-x));
+}
+
+.editor p { margin: 0 0 var(--t-para); white-space: pre-wrap; }
+.editor a { color: var(--t-link); text-decoration: underline; text-underline-offset: 2px; }
+.editor ul, .editor ol { margin: 0 0 var(--t-para); padding-left: 28px; }
+.editor li { margin: 0 0 4px; }
+
+.editor h1, .editor h2, .editor h3 {
+    font-family: var(--t-hfamily);
+    font-weight: var(--t-hweight);
+    font-stretch: var(--t-hstretch);
+    line-height: var(--t-hline);
+    letter-spacing: var(--t-htrack);
+    margin: .6em 0 .35em;
+}
+
+.editor h1 { font-size: var(--t-h1); margin-top: 0; }
+.editor h2 { font-size: var(--t-h2); }
+.editor h3 { font-size: var(--t-h3); }
+
+.editor blockquote {
+    margin: 0 0 var(--t-para);
+    padding-left: 20px;
+    border-left: 3px solid var(--border);
+}
+
+.editor table.doc-table { border-collapse: separate; border-spacing: 0; margin: 10px 0; }
+.editor table.doc-table td { border: 1px solid #b9c0c8; padding: 6px 10px; min-width: 48px; vertical-align: top; }
+.editor .doc-divider { text-align: center; }
+
+@media (max-width: 1000px) {
+    .split { flex-direction: column; }
+    .panel { width: auto; border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+.sub-head {
+    margin: 22px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
