@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SecureDoc — passphrase checks</title>
+<!-- Development page, like tools/font-tuner.html: it is not part of the app. The project has no
+     test runner (DESIGN.md §6.6), so the passphrase helpers the Open screen leans on are checked
+     here, in the browser that runs them. Serve the repository (run.bat) and open
+     /tools/open-tests.html; every line must be green. The field itself (counter, bars, clearing)
+     is checked by hand in the app — see §6.6. -->
+<style>
+    body { margin: 0; padding: 24px; font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #15171C; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p.sub { margin: 0 0 18px; color: #5B6170; }
+    #summary { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-weight: 600; }
+    .pass { background: #EDF7F1; color: #14593A; }
+    .fail { background: #FEF3F2; color: #912018; }
+    ol { margin: 0; padding-left: 22px; }
+    li { padding: 2px 0; }
+    li.fail { color: #912018; font-weight: 600; }
+    li .why { color: #912018; }
+</style>
+</head>
+<body>
+<h1>Passphrase — checks</h1>
+<p class="sub">What the Open screen's field is read with (SECUREDOC_OPEN_REDESIGN.md §4, §5, §8).</p>
+<div id="summary">running…</div>
+<ol id="results"></ol>
+
+<script src="../js/wordlist.js"></script>
+<script src="../js/passphrase.js"></script>
+<script>
+(function () {
+    'use strict';
+    const results = [];
+    function test(name, fn) {
+        try {
+            fn();
+            results.push({ name: name, ok: true });
+        } catch (e) {
+            results.push({ name: name, ok: false, why: (e && e.message) || String(e) });
+        }
+    }
+    function eq(actual, expected, what) {
+        const a = JSON.stringify(actual), b = JSON.stringify(expected);
+        if (a !== b) throw new Error((what || 'value') + ': expected ' + b + ', got ' + a);
+    }
+    function ok(cond, what) { if (!cond) throw new Error(what || 'expected true'); }
+
+    const PHRASE = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+    const WORDS = new Set(window.BIP39);
+
+    // The Open screen reads its field exactly this way: canonical() for the phrase that is fed to
+    // the key derivation, the word set for "is this a word of the list", wordCount for the counter.
+    test('the word list is the official BIP-39 English one', function () {
+        eq(window.BIP39.length, 2048, 'list length');
+        ok(WORDS.has('abandon') && !WORDS.has('abandonn'), 'membership');
+    });
+
+    test('a phrase is trimmed, lowercased and single-spaced', function () {
+        eq(Passphrase.canonical('  ABANDON \t Ability\nable  '), 'abandon ability able');
+        eq(Passphrase.canonical(''), '');
+        eq(Passphrase.canonical('   '), '');
+    });
+
+    test('a phrase pasted as one line counts as twelve words', function () {
+        eq(Passphrase.wordCount(PHRASE), 12);
+        eq(Passphrase.wordCount(PHRASE.replace(/ /g, '\n')), 12, 'newlines');
+        eq(Passphrase.wordCount(PHRASE.toUpperCase()), 12, 'mixed case');
+    });
+
+    test('too few or too many words are counted as such', function () {
+        eq(Passphrase.wordCount(PHRASE.split(' ').slice(0, 11).join(' ')), 11);
+        eq(Passphrase.wordCount(PHRASE + ' zoo'), 13);
+    });
+
+    // The Open screen's button names the first word that is not in the list; this is how it finds it.
+    test('the first word outside the list is found by its position', function () {
+        const words = Passphrase.canonical(PHRASE.replace('about', 'abuot')).split(' ');
+        let bad = -1;
+        for (let i = 0; i < words.length; i++) { if (!WORDS.has(words[i])) { bad = i; break; } }
+        eq(bad, 3, 'index');
+        eq(words[bad], 'abuot', 'word');
+    });
+
+    test('a phrase of twelve list words is accepted', function () {
+        eq(Passphrase.validate(PHRASE), null);
+        ok(Passphrase.validate(PHRASE.replace('about', 'abuot')) !== null, 'a non-word is refused');
+        ok(Passphrase.validate(PHRASE + ' zoo') !== null, 'thirteen words are refused');
+    });
+
+    test('reading a phrase writes nothing to any browser store', function () {
+        function snapshot(store) {
+            const out = [];
+            for (let i = 0; i < store.length; i++) out.push(store.key(i) + '=' + store.getItem(store.key(i)));
+            return out.sort();
+        }
+        const before = { local: snapshot(localStorage), session: snapshot(sessionStorage) };
+        Passphrase.canonical(PHRASE);
+        Passphrase.wordCount(PHRASE);
+        Passphrase.validate(PHRASE);
+        eq(snapshot(localStorage), before.local, 'localStorage');
+        eq(snapshot(sessionStorage), before.session, 'sessionStorage');
+        snapshot(localStorage).forEach(function (entry) {
+            ok(entry.indexOf('.sdoc') === -1, 'no file name in localStorage: ' + entry);
+        });
+    });
+
+    const list = document.getElementById('results');
+    let failed = 0;
+    results.forEach(function (r) {
+        const li = document.createElement('li');
+        li.textContent = r.name;
+        if (!r.ok) {
+            failed++;
+            li.className = 'fail';
+            const why = document.createElement('span');
+            why.className = 'why';
+            why.textContent = ' — ' + r.why;
+            li.appendChild(why);
+        }
+        list.appendChild(li);
+    });
+    const sum = document.getElementById('summary');
+    sum.className = failed ? 'fail' : 'pass';
+    sum.textContent = failed
+        ? failed + ' of ' + results.length + ' checks failed'
+        : 'all ' + results.length + ' checks passed';
+})();
+</script>
+</body>
+</html>

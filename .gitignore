@@ -1,0 +1,26 @@
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local scratch / sample documents
+*.sdoc
+# ...except the compatibility samples in testdata/
+!testdata/*.sdoc
+
+# Scratch files from test runs (kept inside the project)
+tmp/
+
+# Working notes for coding agents — kept on this machine, out of the repository
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# The variable font the tuner loads for trying axes out (1.7 MB, not part of the app)
+tools/fonts/
