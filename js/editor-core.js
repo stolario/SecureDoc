@@ -40,6 +40,7 @@ window.Editor = (function () {
         setupMathHistory();
         setupDividerEditing();
         setupCaretMemory();
+        setupFontHoisting();
     }
 
     // ── caret memory ──
@@ -605,6 +606,65 @@ window.Editor = (function () {
             document.execCommand('styleWithCSS', false, false);
         }
         fireInput();
+    }
+
+    // ── a line's font belongs to the line ──
+    // A family typed into a span alone leaks out of that span: clicking at the end of the line, or
+    // pressing Enter there, puts the caret in the paragraph *beside* the span, and what is typed
+    // next falls back to the page's font. So once a whole line reads in one family, the family moves
+    // from the span onto the block — which is how the saved file stores it anyway (DocHtml.store's
+    // hoistWholeBlockFont), and the caret then only has to be inside the paragraph. Enter copies the
+    // block's style onto the new line, so the next line keeps the font too.
+    const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'BLOCKQUOTE', 'TD', 'TH',
+        'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+
+    function blockAround(node) {
+        let n = node && node.nodeType === 3 ? node.parentNode : node;
+        while (n && n !== el && !BLOCK_TAGS.has(n.tagName)) { n = n.parentNode; }
+        return n && n !== el && el.contains(n) ? n : null;
+    }
+
+    // The single element holding all of a node's content — nothing beside it but a trailing <br> and
+    // the zero-width placeholders — when that element is a span; otherwise null.
+    function soleSpan(node) {
+        let found = null;
+        for (let c = node.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 3) {
+                if (c.nodeValue.split(ZWSP).join('') === '') { continue; }
+                return null; // bare text beside the span: the span is not the whole line
+            }
+            if (c.nodeType !== 1) { return null; }
+            if (c.tagName === 'BR' && !c.nextSibling) { continue; }
+            if (found) { return null; }
+            found = c;
+        }
+        return found && found.tagName === 'SPAN' ? found : null;
+    }
+
+    function hoistBlockFamily(block) {
+        if (!block || !BLOCK_TAGS.has(block.tagName)) { return; }
+        block.normalize();
+        // Spans nest (a size around a family, a later pick inside an earlier one): walk the chain
+        // while each span still covers the whole line. The innermost family is the one that shows.
+        for (let span = soleSpan(block); span; span = soleSpan(span)) {
+            const family = span.style.fontFamily;
+            if (!family) { continue; }
+            block.style.fontFamily = family;
+            span.style.removeProperty('font-family');
+            if (!span.getAttribute('style')) { span.removeAttribute('style'); }
+        }
+    }
+
+    // After every edit, for the line being typed in and the one just left behind (Enter).
+    function setupFontHoisting() {
+        el.addEventListener('input', function () {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) { return; }
+            const block = blockAround(sel.getRangeAt(0).startContainer);
+            if (!block) { return; }
+            hoistBlockFamily(block);
+            hoistBlockFamily(block.previousElementSibling);
+        });
     }
 
     function dropInnerSizes(root) {
