@@ -107,6 +107,15 @@ README.md
 A document is **HTML** (what the editor holds); images are kept separately.
 
 - **Formatting** — `<b>`, `<i>`, `<u>`; font size — `<span style="font-size:…pt">`.
+- **Fonts** — the font of a run is `font-family` on the smallest element that covers it. A family
+  that covers a whole line moves onto its block (`<p style="font-family: …">`) as the line is
+  typed, and one that covers the whole document moves onto a wrapper around the content
+  (`<div style="font-family: …">`, written by `Editor.serialize`, taken off again by
+  `Editor.load`, which puts it on the editor element). That wrapper is the document's font: new
+  paragraphs and text pasted without a font of their own take it. Without it the font is the
+  app's own (`.editor` in `css/style.css`). The hoisting is not cosmetic — a family left on a
+  `<span>` alone stops applying as soon as the caret steps out of the span (the end of the line,
+  or the line after Enter), and typing there would fall back to the app's font.
 - **Alignment/indentation** — `text-align` and paragraph indents (`execCommand`).
 - **Tables** — `<table class="doc-table">`; cell fill — `background-color`.
 - **Images** — `<img data-media-id="img-…" src="media://img-…">`. Image bytes are **not** in

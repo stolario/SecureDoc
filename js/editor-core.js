@@ -604,6 +604,9 @@ window.Editor = (function () {
             document.execCommand('styleWithCSS', false, true);
             document.execCommand('fontName', false, family);
             document.execCommand('styleWithCSS', false, false);
+            // The whole document may now read in this family — then it is the document's font.
+            textBlocks().forEach(hoistBlockFamily);
+            syncDocumentFamily();
         }
         fireInput();
     }
@@ -617,6 +620,10 @@ window.Editor = (function () {
     // block's style onto the new line, so the next line keeps the font too.
     const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'BLOCKQUOTE', 'TD', 'TH',
         'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+
+    function tidyStyle(node) {
+        if (node.hasAttribute('style') && !node.getAttribute('style')) { node.removeAttribute('style'); }
+    }
 
     function blockAround(node) {
         let n = node && node.nodeType === 3 ? node.parentNode : node;
@@ -642,8 +649,18 @@ window.Editor = (function () {
     }
 
     function hoistBlockFamily(block) {
-        if (!block || !BLOCK_TAGS.has(block.tagName)) { return; }
+        if (!block || !BLOCK_TAGS.has(block.tagName)) { return false; }
         block.normalize();
+        tidyStyle(block);
+        // A span left holding nothing but the line's <br> (what the browser leaves behind when a
+        // line's font changes) still says which font it is in, and the next edit would read that.
+        block.querySelectorAll('span[style*="font-family"]').forEach(function (s) {
+            if (s.textContent === '' && s.querySelector('br')) {
+                s.style.removeProperty('font-family');
+                tidyStyle(s);
+            }
+        });
+        let moved = false;
         // Spans nest (a size around a family, a later pick inside an earlier one): walk the chain
         // while each span still covers the whole line. The innermost family is the one that shows.
         for (let span = soleSpan(block); span; span = soleSpan(span)) {
@@ -652,18 +669,65 @@ window.Editor = (function () {
             block.style.fontFamily = family;
             span.style.removeProperty('font-family');
             if (!span.getAttribute('style')) { span.removeAttribute('style'); }
+            moved = true;
         }
+        return moved;
     }
 
-    // After every edit, for the line being typed in and the one just left behind (Enter).
+    // ── the document's own font ──
+    // One step further up: when every line of the document reads in the same family, the family
+    // belongs to the document, not to each paragraph. It moves onto the editor itself — saved as the
+    // <div style="font-family: …"> the content is wrapped in — and the paragraphs are left clean.
+    // That is also what makes it a default: a new paragraph, or text pasted without a font of its
+    // own, takes the document's font instead of the one the app's stylesheet happens to set.
+    const LEAF_BLOCKS = 'p,div,li,blockquote,h1,h2,h3,h4,h5,h6,td,th';
+
+    // Families as CSSOM writes them differ by quoting ('"Roboto Flex"' vs 'Roboto Flex'), so compare
+    // them unquoted and case-insensitively.
+    function sameFamily(a, b) {
+        const plain = function (v) {
+            return String(v || '').replace(/["']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        };
+        return plain(a) === plain(b);
+    }
+
+    // The blocks that hold the text: a block with another block inside it is a container, and its
+    // own style says nothing about any one line.
+    function textBlocks() {
+        return Array.prototype.filter.call(el.querySelectorAll(LEAF_BLOCKS), function (b) {
+            return !b.querySelector(LEAF_BLOCKS);
+        });
+    }
+
+    function syncDocumentFamily() {
+        const blocks = textBlocks();
+        if (!blocks.length) { return; }
+        const root = el.style.fontFamily;
+        let one = null;
+        for (let i = 0; i < blocks.length; i++) {
+            const family = blocks[i].style.fontFamily || root;
+            if (!family) { return; }                        // a line on the stylesheet's own font
+            if (one === null) { one = family; } else if (!sameFamily(one, family)) { return; }
+        }
+        if (!sameFamily(one, root)) { el.style.fontFamily = one; }
+        blocks.forEach(function (b) {
+            if (!b.style.fontFamily) { return; }
+            b.style.removeProperty('font-family');
+            if (!b.getAttribute('style')) { b.removeAttribute('style'); }
+        });
+    }
+
+    // After every edit, for the line being typed in and the one just left behind (Enter). The
+    // document-wide pass only has to run when a line's own family has just changed.
     function setupFontHoisting() {
         el.addEventListener('input', function () {
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) { return; }
             const block = blockAround(sel.getRangeAt(0).startContainer);
             if (!block) { return; }
-            hoistBlockFamily(block);
-            hoistBlockFamily(block.previousElementSibling);
+            let moved = hoistBlockFamily(block);
+            moved = hoistBlockFamily(block.previousElementSibling) || moved;
+            if (moved || block.style.fontFamily) { syncDocumentFamily(); }
         });
     }
 
@@ -1327,7 +1391,14 @@ window.Editor = (function () {
             if (!i.getAttribute('class')) { i.removeAttribute('class'); }
         });
         stripSizePlaceholders(clone);
-        return DocHtml.store(clone.innerHTML);
+        const html = DocHtml.store(clone.innerHTML);
+        const family = el.style.fontFamily;
+        if (!family) { return html; }
+        // The document's font travels with the content, in a wrapper the allow-list already keeps
+        // (a <div> with a font-family). Any app that only renders the HTML gets the font with it;
+        // load() takes the wrapper back off.
+        const quoted = family.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        return '<div style="font-family: ' + quoted + '">' + html + '</div>';
     }
 
     // Stored HTML -> editor. A .sdoc may come from someone else: DocHtml.load rebuilds it from the
@@ -1336,10 +1407,32 @@ window.Editor = (function () {
     // The result is parsed inertly and only then moved into the editor.
     function load(html) {
         const doc = new DOMParser().parseFromString(DocHtml.load(html, mediaUrl), 'text/html');
-        el.replaceChildren.apply(el, Array.prototype.slice.call(doc.body.childNodes));
+        let root = doc.body;
+        // A document whose content is wrapped in a <div> that sets nothing but a font-family carries
+        // its font that way (see serialize). Take it onto the editor and keep the blocks at the top
+        // level, where the rest of the editor expects them.
+        const wrapper = onlyChild(root);
+        el.style.removeProperty('font-family');
+        if (wrapper && wrapper.tagName === 'DIV' && wrapper.style.length === 1
+                && wrapper.style.fontFamily && !wrapper.attributes.getNamedItem('class')) {
+            el.style.fontFamily = wrapper.style.fontFamily;
+            root = wrapper;
+        }
+        el.replaceChildren.apply(el, Array.prototype.slice.call(root.childNodes));
         lockDividers();
         mathSlots.clear();
         deselectImg();
+    }
+
+    // The one element a node holds, when nothing but whitespace stands beside it.
+    function onlyChild(node) {
+        let found = null;
+        for (let c = node.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 3 && !c.nodeValue.trim()) { continue; }
+            if (c.nodeType !== 1 || found) { return null; }
+            found = c;
+        }
+        return found;
     }
 
     // ── image resize (drag a corner handle) ──
