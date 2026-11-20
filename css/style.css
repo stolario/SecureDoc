@@ -911,11 +911,21 @@ body > .bg-anim { position: fixed; z-index: -1; }
 /* Roboto Flex above is made visually tall by its private vertical axes. Roboto Serif has no
    equivalent axes, so match Flex's 0.57 x-height with font-size-adjust and use Serif's real wdth
    axis to recover the same narrow texture. Both adjustments use the font's designed outlines rather
-   than a geometric transform, which would distort its strokes and serifs. */
+   than a geometric transform, which would distort its strokes and serifs.
+   The editor element itself is in the list: it carries the document's own font (§4), and without
+   it a document written entirely in Serif lost the compensation and set wider, taller lines than
+   the same text in a single Serif paragraph. The second rule takes the compensation off again
+   wherever another family is declared below it — Serif's measurements must not reach Amstelvar. */
+.editor[style*="Roboto Serif" i],
 .editor font[face="Roboto Serif" i],
 .editor [style*="Roboto Serif" i] {
     font-size-adjust: 0.57;
     font-variation-settings: "wdth" 55;
+}
+.editor font[face]:not([face="Roboto Serif" i]),
+.editor [style*="font-family" i]:not([style*="Roboto Serif" i]) {
+    font-size-adjust: none;
+    font-variation-settings: normal;
 }
 .editor:focus { box-shadow: 0 2px 16px rgba(30, 90, 200, .18); }
 

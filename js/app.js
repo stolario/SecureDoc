@@ -2123,6 +2123,7 @@
                 'html{background:#eef1f5}body{box-sizing:border-box;max-width:966px;min-height:100vh;margin:0 auto;padding:64px 72px;background:#fff;color:#15171c;font:16px/1.6 \"Amstelvar\",-apple-system,\"Segoe UI\",Roboto,Arial,sans-serif;white-space:pre-wrap;tab-size:1.27cm}' +
                 'p{margin:0 0 12px}a{color:#2459c4;text-decoration:underline;text-underline-offset:2px}img{max-width:100%;height:auto}' +
                 '[style*=\"Roboto Serif\"]{font-size-adjust:.57;font-variation-settings:\"wdth\" 55}' +
+                'font[face]:not([face=\"Roboto Serif\" i]),[style*=\"font-family\"]:not([style*=\"Roboto Serif\"]){font-size-adjust:none;font-variation-settings:normal}' +
                 'math{font-size:1.12em;white-space:normal}math[display="block"]{display:block;margin:12px 0;text-align:center}' +
                 'table.doc-table{border-collapse:separate;border-spacing:0;margin:10px 0;overflow:hidden;border-radius:var(--table-radius,0)}' +
                 'table.doc-table td{border:1px solid #b9c0c8;padding:6px 10px;min-width:48px;vertical-align:top}' +
