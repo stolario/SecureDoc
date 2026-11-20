@@ -535,7 +535,7 @@ window.Editor = (function () {
         const sel = window.getSelection();
         if (!sel || !sel.rangeCount) { return; }
         if (sel.isCollapsed) {
-            startSizeAtCaret(sel, pt);
+            startStyleAtCaret(sel, 'font-size', pt + 'pt');
         } else {
             document.execCommand('styleWithCSS', false, false); // we want <font>, not the browser's spans
             document.execCommand('fontSize', false, SIZE_MARKER);
@@ -553,20 +553,58 @@ window.Editor = (function () {
         fireInput();
     }
 
-    // Nothing selected: behave like Word and set the size for whatever gets typed next. There is no
-    // API for a pending style we can express in points, so plant an empty span at the caret and put
-    // the caret inside it. The zero-width space is what keeps the span alive until it holds real
-    // text; serialize() strips it back out.
-    function startSizeAtCaret(sel, pt) {
+    // Nothing selected: behave like Word and set the look of whatever gets typed next. The browser's
+    // own pending style is no use here — it cannot express a size in points, and the next toolbar
+    // pick (which edits the DOM) drops it, so choosing a family and then a size used to lose the
+    // family and type on in the page's default. Instead plant an empty span at the caret and put the
+    // caret inside it. The zero-width space is what keeps the span alive until it holds real text;
+    // serialize() strips it back out. A placeholder already at the caret takes the new property as
+    // well, so family and size end up on one span and neither pick undoes the other.
+    function startStyleAtCaret(sel, prop, value) {
+        const range = sel.getRangeAt(0);
+        const here = placeholderAt(range);
+        if (here) {
+            here.style.setProperty(prop, value);
+            return;
+        }
         const span = document.createElement('span');
-        span.style.fontSize = pt + 'pt';
+        span.style.setProperty(prop, value);
         span.appendChild(document.createTextNode(ZWSP));
-        sel.getRangeAt(0).insertNode(span);
+        range.insertNode(span);
         const r = document.createRange();
         r.setStart(span.firstChild, 1);
         r.collapse(true);
         sel.removeAllRanges();
         sel.addRange(r);
+    }
+
+    // The placeholder span the caret stands in, if any: a span holding nothing but the zero-width
+    // space, planted by an earlier pick that has not been typed into yet.
+    function placeholderAt(range) {
+        let n = range.startContainer;
+        if (n.nodeType === 1) { n = n.childNodes[range.startOffset] || n; }
+        const span = n.nodeType === 3 ? n.parentNode : n;
+        if (!span || span.tagName !== 'SPAN' || !el.contains(span)) { return null; }
+        return span.textContent === ZWSP ? span : null;
+    }
+
+    // ── font family ──
+    // The selection goes through the browser (it splits across blocks, cells and existing spans);
+    // a bare caret gets a placeholder span, so the family survives until it is typed into.
+    function setFontFamily(family) {
+        focusEditor();
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) { return; }
+        if (sel.isCollapsed) {
+            startStyleAtCaret(sel, 'font-family', family);
+        } else {
+            // fontName normally produces the deprecated <font face="…"> in Chromium. Ask it for CSS
+            // just for this operation, then restore the semantic-tag mode the other tools use.
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('fontName', false, family);
+            document.execCommand('styleWithCSS', false, false);
+        }
+        fireInput();
     }
 
     function dropInnerSizes(root) {
@@ -1313,6 +1351,7 @@ window.Editor = (function () {
         removeLink: removeLink,
         clearFormat: clearFormat,
         setFontSize: setFontSize,
+        setFontFamily: setFontFamily,
         fontSizeAt: fontSizeAt,
         insertTable: insertTable,
         insertDivider: insertDivider,

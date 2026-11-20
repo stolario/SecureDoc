@@ -821,13 +821,7 @@
     fontFamilySel.addEventListener('change', function () {
         const family = fontFamilySel.value;
         if (DOC_FAMILIES.indexOf(family) === -1) return;
-        Editor.focus();
-        // fontName normally produces the deprecated <font face="…"> in Chromium. Ask it for CSS
-        // just for this operation, then restore semantic-tag mode used by the other toolbar tools.
-        document.execCommand('styleWithCSS', false, true);
-        document.execCommand('fontName', false, family);
-        document.execCommand('styleWithCSS', false, false);
-        $('editor').dispatchEvent(new Event('input', { bubbles: true }));
+        Editor.setFontFamily(family);
         markDirty();
     });
 
