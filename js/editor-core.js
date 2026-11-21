@@ -523,14 +523,248 @@ window.Editor = (function () {
         return false;
     }
 
-    // ── font size ──
-    // execCommand('fontSize') only speaks the seven legacy <font size> buckets — far too coarse, and
-    // it writes a deprecated tag. So the browser does the hard part (splitting the selection across
-    // blocks, list items, table cells and existing spans) with the largest bucket as a marker, and we
-    // swap every marker for a span carrying the real size in points — the unit Word shows.
-    const SIZE_MARKER = '7';
     const ZWSP = String.fromCharCode(0x200B); // written as a code point: it is invisible in source
 
+    // ── giving a selection one inline declaration ──
+    // execCommand decides for itself where the markup lands: fontSize speaks only the seven legacy
+    // <font size> buckets, fontName writes a deprecated <font face>, and both nest their result
+    // inside spans that already carry the property — the inner one wins, so the pick appears to do
+    // nothing. The markup is built here instead, and only the last step goes through the browser:
+    // insertHTML replaces the selected content with the finished HTML. That matters for one reason
+    // — insertHTML is recorded in the browser's own undo stack, so Ctrl+Z still takes the change
+    // back, which a hand-made DOM mutation would not. (There is no API for adding an entry to that
+    // stack; UndoManager was never shipped.)
+    //
+    // insertHTML must never be handed a block or a table cell: it would split or duplicate them. So
+    // the selection is first cut into runs of inline content — adjacent text with nothing but inline
+    // wrappers between it — and each run is replaced on its own. A selection inside one paragraph
+    // (the usual case) is a single run, and a single undo step.
+
+    // The property the new declaration sets must not survive anywhere inside the run, or it would
+    // out-specify the one just picked. Works on the detached clone, before it is inserted.
+    function dropDeclaration(root, prop) {
+        root.querySelectorAll('[style*="' + prop + '"]').forEach(function (n) {
+            n.style.removeProperty(prop);
+            if (!n.getAttribute('style')) { n.removeAttribute('style'); }
+            if (n.tagName === 'SPAN' && n.attributes.length === 0) { unwrap(n); }
+        });
+        const attr = prop === 'font-size' ? 'size' : 'face';
+        root.querySelectorAll('font[' + attr + ']').forEach(function (f) {
+            f.removeAttribute(attr);
+            if (f.attributes.length === 0) { unwrap(f); }
+        });
+    }
+
+    // What the range covers of each text node it touches, in document order: {node, from, to}.
+    // The boundary nodes are left whole — splitting them before the insert is what breaks redo,
+    // since the browser merges the halves back on undo and its redo record then finds nothing
+    // where it left off. The zero-width placeholders carry no text of their own and are left where
+    // they are; so is the text inside a formula, which has no place for a span of its own and
+    // reads in the size and family of the line it sits on.
+    function selectedParts(range) {
+        const out = [];
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+            const len = n.nodeValue.length;
+            if (!len || n.nodeValue.split(ZWSP).join('') === '') { continue; }
+            if (n.parentNode.closest('math')) { continue; }
+            if (range.comparePoint(n, 0) > 0 || range.comparePoint(n, len) < 0) { continue; }
+            const from = n === range.startContainer ? range.startOffset : 0;
+            const to = n === range.endContainer ? range.endOffset : len;
+            if (to > from) { out.push({ node: n, from: from, to: to }); }
+        }
+        return out;
+    }
+
+    // Whether two selected text nodes may go into one run: the same block, and nothing between them
+    // but inline wrappers. An element that holds one of them is one of those wrappers (or the block
+    // itself) and says nothing about the gap. Anything else there — an image, a formula, a <br> —
+    // ends the run, so it is never cloned and re-inserted.
+    function joinable(a, b) {
+        const block = blockAround(a);
+        if (!block || block !== blockAround(b)) { return false; }
+        const gap = document.createRange();
+        gap.setStartAfter(a);
+        gap.setEndBefore(b);
+        const inside = block.querySelectorAll('*');
+        for (let i = 0; i < inside.length; i++) {
+            const n = inside[i];
+            if (n.contains(a) || n.contains(b)) { continue; }
+            if (!gap.intersectsNode(n)) { continue; }
+            if (!INLINE_WRAP.has(n.nodeName.toLowerCase())) { return false; }
+        }
+        return true;
+    }
+
+    // [first, last] part per run of inline content.
+    function inlineRuns(parts) {
+        const runs = [];
+        parts.forEach(function (part) {
+            const open = runs.length ? runs[runs.length - 1] : null;
+            if (open && joinable(open[1].node, part.node)) { open[1] = part; }
+            else { runs.push([part, part]); }
+        });
+        return runs;
+    }
+
+    // Nodes cannot be held on to across an insertHTML: the browser merges and replaces text nodes
+    // around the one it touches, in neighbouring blocks too. What it does not change is the text
+    // itself, so a run is remembered as its block and how far into that block's characters it runs
+    // — and resolved back to nodes only at the moment it is restyled.
+    // The text a block's offsets are counted in: the same nodes selectedParts may pick, so that a
+    // formula's own characters shift nothing.
+    function blockTexts(block) {
+        const out = [];
+        const walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+            if (n.parentNode.closest('math')) { continue; }
+            out.push(n);
+        }
+        return out;
+    }
+
+    function offsetInBlock(block, node, offset) {
+        const texts = blockTexts(block);
+        let seen = 0;
+        for (let i = 0; i < texts.length; i++) {
+            if (texts[i] === node) { return seen + offset; }
+            seen += texts[i].nodeValue.length;
+        }
+        return null;
+    }
+
+    function pointAt(block, offset) {
+        const texts = blockTexts(block);
+        let seen = 0;
+        for (let i = 0; i < texts.length; i++) {
+            if (offset <= seen + texts[i].nodeValue.length) {
+                return { node: texts[i], offset: offset - seen };
+            }
+            seen += texts[i].nodeValue.length;
+        }
+        return null;
+    }
+
+    function rangeOf(run) {
+        const from = pointAt(run.block, run.start);
+        const to = pointAt(run.block, run.end);
+        if (!from || !to) { return null; }
+        const range = document.createRange();
+        range.setStart(from.node, from.offset);
+        range.setEnd(to.node, to.offset);
+        return range;
+    }
+
+    function blockRuns(parts) {
+        const runs = [];
+        inlineRuns(parts).forEach(function (run) {
+            const block = blockAround(run[0].node);
+            if (!block) { return; }
+            const start = offsetInBlock(block, run[0].node, run[0].from);
+            const end = offsetInBlock(block, run[1].node, run[1].to);
+            if (start == null || end == null || end <= start) { return; }
+            runs.push({ block: block, start: start, end: end });
+        });
+        return runs;
+    }
+
+    // Chrome leaves a stray <br> behind when insertHTML lands next to a <math>. For the length of
+    // the insert the block's formulas therefore step aside for the placeholder images the paste
+    // path already uses (MATH_SLOT): the command leaves those alone. They stay registered in
+    // mathSlots, so the undo/redo handlers put the formulas back around a step that remembers the
+    // placeholders — the same bargain a pasted formula is kept under.
+    function shieldMaths(block) {
+        const slots = [];
+        block.querySelectorAll('math').forEach(function (math) {
+            const slot = document.createElement('img');
+            slot.setAttribute(MATH_SLOT, '');
+            slot.setAttribute('alt', '');
+            mathSlots.set(slot, math);
+            math.replaceWith(slot);
+            slots.push(slot);
+        });
+        return slots;
+    }
+
+    function unshieldMaths(slots) {
+        slots.forEach(function (slot) {
+            if (el.contains(slot)) { slot.replaceWith(mathSlots.get(slot)); }
+        });
+    }
+
+    // Whether the run is everything the block has to say.
+    function coversBlock(run) {
+        if (run.start !== 0) { return false; }
+        let total = 0;
+        blockTexts(run.block).forEach(function (t) { total += t.nodeValue.length; });
+        return run.end === total;
+    }
+
+    function restyleRun(sel, run, prop, value) {
+        // Chrome throws a font-family away when the markup it inserts replaces all of a block's
+        // content — it treats the family as the block's to give. The family of a whole line belongs
+        // on the line anyway (hoistBlockFamily moves it there a moment later), so it is written
+        // straight onto the block. Like that hoisting, this step is not on the undo stack.
+        if (prop === 'font-family' && coversBlock(run)) {
+            dropDeclaration(run.block, prop);
+            run.block.style.setProperty(prop, value);
+            return;
+        }
+        const range = rangeOf(run);
+        if (!range) { return; }
+        const holder = document.createElement('div');
+        holder.appendChild(range.cloneContents());
+        dropDeclaration(holder, prop);
+        // A span that already covers the whole run takes the declaration itself. Wrapping it in a
+        // second one would not survive the insert: Chrome strips the style off a span it finds
+        // nested around another — and one span per run is what the saved file should hold anyway.
+        const whole = holder.childNodes.length === 1 && holder.firstChild.nodeName === 'SPAN'
+            ? holder.firstChild : null;
+        if (whole) {
+            whole.style.setProperty(prop, value);
+        } else {
+            const span = document.createElement('span');
+            span.style.setProperty(prop, value);
+            while (holder.firstChild) { span.appendChild(holder.firstChild); }
+            holder.appendChild(span);
+        }
+        const slots = shieldMaths(run.block);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        try {
+            insertHtml(holder.innerHTML); // keeps Chrome from writing the old look into the insert
+        } finally {
+            unshieldMaths(slots);
+        }
+    }
+
+    // true when the selection carried text to restyle.
+    function styleSelection(prop, value) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) { return false; }
+        const range = sel.getRangeAt(0);
+        if (!el.contains(range.commonAncestorContainer)) { return false; }
+        const runs = blockRuns(selectedParts(range));
+        if (!runs.length) { return false; }
+        // Last run first, so that a block already measured is not re-measured after an insert.
+        for (let i = runs.length - 1; i >= 0; i--) {
+            restyleRun(sel, runs[i], prop, value);
+        }
+        // What was restyled stays selected: the user picks a family and then a size on it.
+        const from = pointAt(runs[0].block, runs[0].start);
+        const to = pointAt(runs[runs.length - 1].block, runs[runs.length - 1].end);
+        if (from && to) {
+            const back = document.createRange();
+            back.setStart(from.node, from.offset);
+            back.setEnd(to.node, to.offset);
+            sel.removeAllRanges();
+            sel.addRange(back);
+        }
+        return true;
+    }
+
+    // ── font size ──
+    // The size is written in points, the unit Word shows.
     function setFontSize(pt) {
         focusEditor();
         const sel = window.getSelection();
@@ -538,18 +772,7 @@ window.Editor = (function () {
         if (sel.isCollapsed) {
             startStyleAtCaret(sel, 'font-size', pt + 'pt');
         } else {
-            document.execCommand('styleWithCSS', false, false); // we want <font>, not the browser's spans
-            document.execCommand('fontSize', false, SIZE_MARKER);
-            const spans = [];
-            el.querySelectorAll('font[size="' + SIZE_MARKER + '"]').forEach(function (f) {
-                const span = document.createElement('span');
-                span.style.fontSize = pt + 'pt';
-                while (f.firstChild) { span.appendChild(f.firstChild); }
-                f.parentNode.replaceChild(span, f);
-                dropInnerSizes(span);           // a nested size would out-specify the one just applied
-                spans.push(span);
-            });
-            if (spans.length) { reselect(sel, spans); }
+            styleSelection('font-size', pt + 'pt');
         }
         fireInput();
     }
@@ -590,8 +813,7 @@ window.Editor = (function () {
     }
 
     // ── font family ──
-    // The selection goes through the browser (it splits across blocks, cells and existing spans);
-    // a bare caret gets a placeholder span, so the family survives until it is typed into.
+    // A bare caret gets a placeholder span, so the family survives until it is typed into.
     function setFontFamily(family) {
         focusEditor();
         const sel = window.getSelection();
@@ -599,11 +821,7 @@ window.Editor = (function () {
         if (sel.isCollapsed) {
             startStyleAtCaret(sel, 'font-family', family);
         } else {
-            // fontName normally produces the deprecated <font face="…"> in Chromium. Ask it for CSS
-            // just for this operation, then restore the semantic-tag mode the other tools use.
-            document.execCommand('styleWithCSS', false, true);
-            document.execCommand('fontName', false, family);
-            document.execCommand('styleWithCSS', false, false);
+            styleSelection('font-family', family);
             // The whole document may now read in this family — then it is the document's font.
             textBlocks().forEach(hoistBlockFamily);
             syncDocumentFamily();
@@ -721,6 +939,9 @@ window.Editor = (function () {
     // document-wide pass only has to run when a line's own family has just changed.
     function setupFontHoisting() {
         el.addEventListener('input', function () {
+            // Not while insertHtml has lent the root the look of the insertion point: the document
+            // font would be read off that borrowed style and then thrown away with it.
+            if (lendingLook) { return; }
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount) { return; }
             const block = blockAround(sel.getRangeAt(0).startContainer);
@@ -729,23 +950,6 @@ window.Editor = (function () {
             moved = hoistBlockFamily(block.previousElementSibling) || moved;
             if (moved || block.style.fontFamily) { syncDocumentFamily(); }
         });
-    }
-
-    function dropInnerSizes(root) {
-        root.querySelectorAll('[style*="font-size"]').forEach(function (n) {
-            n.style.removeProperty('font-size');
-            if (!n.getAttribute('style')) { n.removeAttribute('style'); }
-            if (n.tagName === 'SPAN' && n.attributes.length === 0) { unwrap(n); }
-        });
-        root.querySelectorAll('font[size]').forEach(function (f) { f.removeAttribute('size'); });
-    }
-
-    function reselect(sel, spans) {
-        const r = document.createRange();
-        r.setStartBefore(spans[0]);
-        r.setEndAfter(spans[spans.length - 1]); // querySelectorAll returns document order
-        sel.removeAllRanges();
-        sel.addRange(r);
     }
 
     // The size in points that applies at the caret, for the toolbar to show. It reads the computed
@@ -896,6 +1100,7 @@ window.Editor = (function () {
     // paste would remove a placeholder no longer there and leave the formula behind. So each pasted
     // formula is kept with its placeholder (mathSlots), and around every undo/redo the formulas step
     // aside for the very placeholders the history knows, then come back once the browser is done.
+    let lendingLook = false;     // the root is wearing the insertion point's style for an insert
     const MATH_SLOT = 'data-math-slot';
     const mathSlots = new Map(); // placeholder <img> -> its <math>
 
@@ -978,11 +1183,13 @@ window.Editor = (function () {
         const own = el.getAttribute('style');
         if (at && el.contains(at) && at !== el) {
             const look = window.getComputedStyle(at);
+            lendingLook = true;
             LOOK.forEach(function (prop) { el.style.setProperty(prop, look.getPropertyValue(prop)); });
         }
         try {
             document.execCommand('insertHTML', false, html);
         } finally {
+            lendingLook = false;
             if (own == null) {
                 el.removeAttribute('style');
             } else {
@@ -992,6 +1199,7 @@ window.Editor = (function () {
                 fillMathSlots(maths);
             }
             lockDividers(); // a pasted divider (copied within the app) is one too
+            fireInput();    // the edit's own input event was ignored while the look was lent out
         }
     }
 
