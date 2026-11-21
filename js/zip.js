@@ -14,19 +14,37 @@ window.Zip = (function () {
     const utf8 = new TextEncoder();
     const utf8Decoder = new TextDecoder('utf-8');
 
-    const CRC_TABLE = (function () {
-        const t = new Uint32Array(256);
+    // Four tables, so the checksum can go four bytes at a time ("slice-by-4"): table k holds the
+    // byte-wise CRC shifted k places on, which is what lets the four lookups be combined. Table 0
+    // is the ordinary CRC-32 table. Every byte of a document and of each image goes through this,
+    // twice for a document that is written and read back, so the loop is worth the three extra tables.
+    const CRC_TABLES = (function () {
+        const tables = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256),
+            new Uint32Array(256)];
         for (let n = 0; n < 256; n++) {
             let c = n;
             for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-            t[n] = c >>> 0;
+            tables[0][n] = c >>> 0;
         }
-        return t;
+        for (let k = 1; k < 4; k++) {
+            for (let n = 0; n < 256; n++) {
+                const prev = tables[k - 1][n];
+                tables[k][n] = (tables[0][prev & 0xff] ^ (prev >>> 8)) >>> 0;
+            }
+        }
+        return tables;
     })();
 
     function crc32(bytes) {
+        const t0 = CRC_TABLES[0], t1 = CRC_TABLES[1], t2 = CRC_TABLES[2], t3 = CRC_TABLES[3];
+        const n = bytes.length;
         let c = 0xffffffff;
-        for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+        let i = 0;
+        for (const end = n - 3; i < end; i += 4) {
+            c ^= bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24);
+            c = (t3[c & 0xff] ^ t2[(c >>> 8) & 0xff] ^ t1[(c >>> 16) & 0xff] ^ t0[c >>> 24]) >>> 0;
+        }
+        for (; i < n; i++) c = t0[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
         return (c ^ 0xffffffff) >>> 0;
     }
 
@@ -71,9 +89,16 @@ window.Zip = (function () {
         const parts = [];
         const central = [];
         let offset = 0;
-        for (const e of entries) {
+        // The entries are independent, so they compress together rather than one after another: each
+        // CompressionStream runs off the main thread, and a document's content and its images no
+        // longer wait on each other. The order of the entries in the archive is unaffected.
+        const deflated = await Promise.all(entries.map(function (e) {
+            return e.deflate ? deflate(e.data) : e.data;
+        }));
+        for (let n = 0; n < entries.length; n++) {
+            const e = entries[n];
             const name = utf8.encode(e.name);
-            const stored = e.deflate ? await deflate(e.data) : e.data;
+            const stored = deflated[n];
             const method = e.deflate ? 8 : 0;
             const crc = crc32(e.data);
 

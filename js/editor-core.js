@@ -17,6 +17,22 @@ window.Editor = (function () {
     // media id -> { blob, url }. The blob is the raw image; url is an object URL for display.
     const media = new Map();
 
+    // ── kinds of edit ──
+    // What an `input` event can have done to the document, by its inputType. Both sets are about
+    // markup, not text: an edit of either kind only moves text in or out at the caret, so the passes
+    // that guard the document's own structure can look next to the caret instead of walking all of
+    // it on every keystroke. An inputType that is not listed here — a paste, a drop, a spellcheck
+    // replacement, undo/redo, an event the app dispatched itself — gets the full pass.
+    //
+    // TYPING_INPUT alone cannot empty a block either: a deleted selection can have taken a line's
+    // whole content with it, which is why deletions are kept apart.
+    const TYPING_INPUT = new Set(['insertText', 'insertCompositionText', 'insertLineBreak',
+        'insertParagraph']);
+    const TEXT_EDIT_INPUT = new Set(Array.from(TYPING_INPUT).concat(
+        ['deleteContentBackward', 'deleteContentForward', 'deleteWordBackward', 'deleteWordForward',
+            'deleteSoftLineBackward', 'deleteSoftLineForward', 'deleteHardLineBackward',
+            'deleteHardLineForward', 'deleteByCut']));
+
     // ── image resize state ──
     let selectedImg = null;
     let handle = null;
@@ -192,7 +208,10 @@ window.Editor = (function () {
         });
         // Backstop for markup that reaches the editor some other way (spellcheck replacement, an
         // extension, a browser quirk): a link that is not on the allow-list never stays live.
-        el.addEventListener('input', function () {
+        // Typing and deleting cannot bring a link in, so they skip the walk — on a document with
+        // many links it ran over every one of them on every keystroke.
+        el.addEventListener('input', function (e) {
+            if (TEXT_EDIT_INPUT.has(e.inputType)) { return; }
             el.querySelectorAll('a').forEach(function (link) {
                 if (!secureLink(link)) {
                     unwrap(link);
@@ -294,7 +313,7 @@ window.Editor = (function () {
             if (!img.getAttribute('class')) { img.removeAttribute('class'); }
         });
         stripSizePlaceholders(holder);
-        const html = DocHtml.store(holder.innerHTML);
+        const html = DocHtml.store(holder);
         return html.trim() ? html : null;
     }
 
@@ -1133,7 +1152,11 @@ window.Editor = (function () {
             if (history(e)) {
                 slotsToMaths();
             }
-            lockDividers(); // after any edit, undo/redo included
+            // After any edit, undo/redo included. Plain typing cannot reach inside a divider (it is
+            // contenteditable="false") and cannot make one, so there it is enough to look at the
+            // lines around the caret instead of walking the whole document on every keystroke;
+            // anything that can bring markup in or take it away gets the full pass.
+            lockDividers(TYPING_INPUT.has(e.inputType) ? dividersAroundCaret() : null);
             caretOutOfDivider();
             setTimeout(caretOutOfDivider, 0); // undo/redo place the caret only after this event
         });
@@ -1276,6 +1299,17 @@ window.Editor = (function () {
         lockDividers();
     }
 
+    /** The divider lines next to the caret, or null (the whole document) when there is no caret. */
+    function dividersAroundCaret() {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) { return null; }
+        const block = blockAround(sel.getRangeAt(0).startContainer);
+        if (!block) { return null; }
+        return [block.previousElementSibling, block, block.nextElementSibling].filter(function (p) {
+            return !!p && p.tagName === 'P' && p.classList.contains('doc-divider');
+        });
+    }
+
     // In the editor a divider is one indivisible ornament, not a line of text. It carries its own
     // class (large Georgia, centred), and as an ordinary paragraph that class leaked into the text:
     // Enter inside it split class and centring onto the new line, and Backspace on the line below
@@ -1283,8 +1317,9 @@ window.Editor = (function () {
     // removes the divider whole (undo brings it back). Editor-only state: DocHtml.store rebuilds from
     // its allow-list, which has no contenteditable. A divider left empty (undoing its insert, say)
     // turns back into a plain empty line, so nothing remains that can't be typed into.
-    function lockDividers() {
-        el.querySelectorAll('p.doc-divider').forEach(function (p) {
+    /** `scope`: the divider lines to check; null or absent for every one in the document. */
+    function lockDividers(scope) {
+        (scope || el.querySelectorAll('p.doc-divider')).forEach(function (p) {
             if (p.textContent.replace(/​/g, '').trim() === '') {
                 p.classList.remove('doc-divider');
                 if (!p.getAttribute('class')) { p.removeAttribute('class'); }
@@ -1599,7 +1634,7 @@ window.Editor = (function () {
             if (!i.getAttribute('class')) { i.removeAttribute('class'); }
         });
         stripSizePlaceholders(clone);
-        const html = DocHtml.store(clone.innerHTML);
+        const html = DocHtml.store(clone); // the copy itself: no serialization and re-parse in between
         const family = el.style.fontFamily;
         if (!family) { return html; }
         // The document's font travels with the content, in a wrapper the allow-list already keeps
@@ -1612,10 +1647,9 @@ window.Editor = (function () {
     // Stored HTML -> editor. A .sdoc may come from someone else: DocHtml.load rebuilds it from the
     // allow-list (nothing may run code, reach the network or restyle the page; the CSP in index.html
     // backs this up) and points media://id at the local blob: URL (media must already be stored).
-    // The result is parsed inertly and only then moved into the editor.
+    // The rebuild happens in an inert document, and its nodes are moved into the editor from there.
     function load(html) {
-        const doc = new DOMParser().parseFromString(DocHtml.load(html, mediaUrl), 'text/html');
-        let root = doc.body;
+        let root = DocHtml.loadBody(html, mediaUrl);
         // A document whose content is wrapped in a <div> that sets nothing but a font-family carries
         // its font that way (see serialize). Take it onto the editor and keep the blocks at the top
         // level, where the rest of the editor expects them.

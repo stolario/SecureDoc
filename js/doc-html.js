@@ -12,7 +12,8 @@
 // does not. Opening a document must never tell anyone that it was opened (each app's CSP backs this).
 //
 //   DocHtml.load(html, mediaUrl)       stored HTML -> editor HTML (media://id -> mediaUrl(id))
-//   DocHtml.store(html)                editor HTML -> stored HTML (src -> media://id), idempotent
+//   DocHtml.loadBody(html, mediaUrl)   the same, as an element of an inert document (no re-parse)
+//   DocHtml.store(html|element)        editor HTML -> stored HTML (src -> media://id), idempotent
 //   DocHtml.paste(html, mediaUrl)      clipboard HTML -> HTML to insert (narrower formatting)
 //   DocHtml.pasteAction(clipboard)     what a paste should do: formula text, an image, HTML or text
 //   DocHtml.adoptPastedImages(root, put, changed)   pasted data:/blob: images -> own media
@@ -138,15 +139,20 @@ window.DocHtml = (function () {
     }
 
     // Puts the safe navigation attributes on a live or rebuilt <a>; false when the href is not allowed.
+    // Writes only what is not already there: on a live link every write is a DOM mutation, and the
+    // editors call this over the links of a whole document to check them.
     function secureLink(link, raw) {
         const href = normalizeLinkUrl(raw == null ? link.getAttribute('href') : raw);
         if (!href) {
             return false;
         }
-        link.setAttribute('href', href);
-        link.setAttribute('title', href);
-        link.setAttribute('target', '_blank');
-        link.setAttribute('rel', 'noopener noreferrer');
+        const set = function (name, value) {
+            if (link.getAttribute(name) !== value) { link.setAttribute(name, value); }
+        };
+        set('href', href);
+        set('title', href);
+        set('target', '_blank');
+        set('rel', 'noopener noreferrer');
         return true;
     }
 
@@ -350,14 +356,20 @@ window.DocHtml = (function () {
     // ── rebuilding ──
 
     // opts: { mode: 'load' | 'store' | 'paste', mediaUrl: id -> url | null }
+    // `html` is markup, or an element whose children are rebuilt as they stand. 'store' and 'load'
+    // only read the source, so passing an element saves a serialization and a parse of the whole
+    // document — which store() is given on every save and every dirty check (see Editor.serialize).
+    // ('paste' normalizes its source in place, so it is only ever handed clipboard markup.)
     function rebuild(html, opts) {
-        const source = new DOMParser().parseFromString(String(html == null ? '' : html), 'text/html');
+        const from = html && html.nodeType === 1
+            ? html
+            : new DOMParser().parseFromString(String(html == null ? '' : html), 'text/html').body;
         const out = document.implementation.createHTMLDocument('');
         const root = out.body;
         if (opts.mode === 'paste') {
-            normalizePastedMath(source.body);
+            normalizePastedMath(from);
         }
-        Array.prototype.slice.call(source.body.childNodes).forEach(function (child) {
+        Array.prototype.slice.call(from.childNodes).forEach(function (child) {
             copyNode(child, root, out, opts);
         });
         if (opts.mode === 'store') {
@@ -647,14 +659,21 @@ window.DocHtml = (function () {
 
     // ── public: the three directions ──
 
-    function load(html, mediaUrl) {
+    // The rebuilt content as an element of an inert document: its children can be moved straight into
+    // an editor, with no serialization and re-parse in between (the nodes are adopted on insert).
+    function loadBody(html, mediaUrl) {
         const root = rebuild(html && String(html).trim() ? html : '<p><br></p>', { mode: 'load', mediaUrl: mediaUrl });
         if (!root.firstChild) {
             root.innerHTML = '<p><br></p>';
         }
-        return root.innerHTML;
+        return root;
     }
 
+    function load(html, mediaUrl) {
+        return loadBody(html, mediaUrl).innerHTML;
+    }
+
+    /** `html`: editor markup, or the editor element (a copy of it) itself. */
     function store(html) {
         return rebuild(html, { mode: 'store' }).innerHTML;
     }
@@ -827,6 +846,7 @@ window.DocHtml = (function () {
 
     return Object.freeze({
         load: load,
+        loadBody: loadBody,
         store: store,
         paste: paste,
         pasteAction: pasteAction,

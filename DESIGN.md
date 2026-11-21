@@ -303,7 +303,9 @@ entire ZIP body is deliberately readable without a passphrase.
   Check: `cd js/vendor && sha256sum -c SHA256SUMS`.
 - **Document content is untrusted** (a `.sdoc` may come from someone else). Opening, pasting and
   saving all go through `js/doc-html.js` (`DocHtml.load` / `paste` / `store`, shared with webchat,
-  §12): the HTML is parsed in an inert `DOMParser` document and **rebuilt from an allow-list** —
+  §12): the HTML is parsed in an inert `DOMParser` document (on a save it is read straight from the
+  copy of its own DOM the editor hands over instead, which saves serializing and re-parsing the
+  whole document) and **rebuilt from an allow-list** into another inert document —
   elements (text formatting, lists, tables, `img`, `a`, `hr`, MathML; `script`, `iframe`, `svg`,
   `form`, `meta`, `base`, `style`, media … are dropped with their contents, unknown tags are
   unwrapped), per-tag attributes (`a[href]` only http/https/mailto/tel; `img` only with an
