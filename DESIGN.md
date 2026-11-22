@@ -130,7 +130,16 @@ A document is **HTML** (what the editor holds); images are kept separately.
     `<hr>` or a divider** is kept, and so is the only block inside a cell or a list item. The
     caret cannot be put inside a table, between two of them or after a closing one without it —
     drop it and text typed there lands in a cell instead.
-- **Alignment/indentation** — `text-align` and paragraph indents (`execCommand`).
+- **Alignment/indentation** — `text-align` and paragraph indents (`execCommand`). A line break
+  inside a block is a **newline in the text** (both editors lay the document out with
+  `white-space: pre-wrap`), and Chrome's `justify*` commands cannot see those lines: in a block
+  that holds one they wrap the *wrong* line in a centred `<div>`, move it and drop text — in a
+  table cell and outside one alike. So when a block the selection reaches holds a newline of its
+  own, `Editor.exec` writes `text-align` onto the blocks itself (`alignLines`) and the whole block
+  takes the alignment, the lines inside it being lines and not blocks. Everything else still goes
+  to the browser, whose step stays on the undo stack — a hand-made change cannot join it, which is
+  the one cost here (Ctrl+Z does not take such an alignment back), and is why the table buttons,
+  which mutate the DOM directly too, are the only other place this bargain is made.
 - **Tables** — `<table class="doc-table">`; cell fill — `background-color`.
 - **Images** — `<img data-media-id="img-…" src="media://img-…">`. Image bytes are **not** in
   the HTML: in the editor they live in an `id → Blob` store and are shown through `blob:` URLs;
@@ -385,6 +394,10 @@ entire ZIP body is deliberately readable without a passphrase.
     looking like that in both SecureDoc and webchat; webchat's `DocumentHtmlContractE2ETest` checks
     its side and saves the file back to `webchat/build/sdoc-roundtrip/`, and that file must open
     here with `Editor.serialize()` equal to the original content.
+  - `test_1.sdoc` — unencrypted, one table cell whose twelve lines are newlines in a single text
+    node, as the editor's `pre-wrap` layout holds them. Select a word in a line in the middle and
+    press **Align centre**: the whole cell must become centred with every line still there. Chrome
+    used to wrap another line in a `<div>`, move it to the wrong place and lose text (§4).
 
 ---
 

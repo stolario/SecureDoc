@@ -409,7 +409,57 @@ window.Editor = (function () {
 
     function exec(cmd) {
         focusEditor();
+        if (ALIGNMENTS[cmd] && alignLines(ALIGNMENTS[cmd])) { return; }
         document.execCommand(cmd, false, null);
+    }
+
+    // ── alignment ──
+    // A line break inside a paragraph or a table cell is a newline in the text (both editors lay
+    // the document out with white-space: pre-wrap), and Chrome's justify* commands cannot see those
+    // lines: on a selection in one of them the browser wraps a *different* line in its centred
+    // <div>, puts it in the wrong place and drops text — in a cell and outside one alike. So where
+    // a block the selection touches holds a newline of its own, the declaration is written here
+    // instead, onto every block the selection reaches. The rest still goes to the browser: it gets
+    // those right, and its step stays on the undo stack, which a hand-made change cannot join (the
+    // table buttons mutate the DOM directly for the same reason).
+    const ALIGNMENTS = {
+        justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right', justifyFull: 'justify'
+    };
+    const ALIGN_BLOCKS = 'p,div,li,blockquote,pre,h1,h2,h3,h4,h5,h6,td,th';
+
+    // The innermost blocks the selection reaches: the one around each end, and every block it
+    // crosses that does not hold another selected block (the alignment belongs to the line, not to
+    // the container around it).
+    function selectedBlocks(range) {
+        const blocks = [];
+        const add = function (node) {
+            const from = node && node.nodeType === 1 ? node : node && node.parentElement;
+            const block = from && from.closest(ALIGN_BLOCKS);
+            if (!block || !el.contains(block) || blocks.indexOf(block) >= 0) { return; }
+            const inner = block.querySelectorAll(ALIGN_BLOCKS);
+            if (Array.prototype.some.call(inner, function (b) { return range.intersectsNode(b); })) {
+                return; // a container: the blocks inside it are the lines being aligned
+            }
+            blocks.push(block);
+        };
+        Array.prototype.forEach.call(el.querySelectorAll(ALIGN_BLOCKS), function (block) {
+            if (range.intersectsNode(block)) { add(block); }
+        });
+        add(range.startContainer);
+        add(range.endContainer);
+        return blocks;
+    }
+
+    // -> true when this took care of it.
+    function alignLines(value) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) { return false; }
+        const blocks = selectedBlocks(sel.getRangeAt(0));
+        const hasOwnLines = blocks.some(function (b) { return b.textContent.indexOf('\n') >= 0; });
+        if (!blocks.length || !hasOwnLines) { return false; }
+        blocks.forEach(function (block) { block.style.textAlign = value; });
+        fireInput();
+        return true;
     }
 
     // ── hyperlinks ──
