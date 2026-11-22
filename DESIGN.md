@@ -107,6 +107,15 @@ README.md
 A document is **HTML** (what the editor holds); images are kept separately.
 
 - **Formatting** — `<b>`, `<i>`, `<u>`; font size — `<span style="font-size:…pt">`.
+- **Line breaks** — a saved document holds a soft line break as **`<br>`**. The editor itself gets
+  a newline character instead: it lays the document out with `white-space: pre-wrap` (so that tabs
+  and runs of spaces show as typed), and in that layout Shift+Enter writes `\n`, as does Enter
+  inside a table cell, where Chrome makes no new block. A save turns those newlines into `<br>`
+  (`newlinesToBreaks` in `js/doc-html.js`), because a line that exists only as a character means
+  something else wherever `pre-wrap` is not applied — paste such a cell into another app and its
+  lines run together — and because the browser's own commands cannot see those lines (alignment,
+  above). Text stays as written inside `<pre>`, `<code>` and MathML, where whitespace is content.
+  Both directions count the same for `Editor.caretPosition`: a `<br>` and a newline weigh 1.
 - **Fonts** — the font of a run is `font-family` on the smallest element that covers it. A family
   that covers a whole line moves onto its block (`<p style="font-family: …">`) as the line is
   typed, and one that covers the whole document moves onto a wrapper around the content

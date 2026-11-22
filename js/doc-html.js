@@ -381,6 +381,7 @@ window.DocHtml = (function () {
             copyNode(child, root, out, opts);
         });
         if (opts.mode === 'store') {
+            newlinesToBreaks(root, out);
             // Contenteditable may leave inline runs directly at the editor root, without a <p>.
             mergeAdjacentEquivalentSpans(root);
         }
@@ -510,6 +511,36 @@ window.DocHtml = (function () {
             return;
         }
         parent.appendChild(el);
+    }
+
+    // A soft line break reaches the editor as a newline character: both editors lay the document
+    // out with white-space: pre-wrap, so Shift+Enter writes one, and so does Enter inside a table
+    // cell, where Chrome makes no new block. Stored like that, the lines of a paragraph or a cell
+    // exist only as long as something applies pre-wrap — paste such a cell into another app and
+    // they run together — and the browser's own commands cannot see them at all (see alignment in
+    // editor-core.js). A save writes <br> instead, which says the same thing anywhere. Whitespace
+    // is content in <pre> and <code>, and MathML has no <br>, so their text is left as written.
+    function newlinesToBreaks(root, out) {
+        const tag = root.localName;
+        if (tag === 'pre' || tag === 'code' || MATH_TAGS.has(tag)) {
+            return;
+        }
+        Array.prototype.slice.call(root.childNodes).forEach(function (node) {
+            if (node.nodeType === 1) {
+                newlinesToBreaks(node, out);
+                return;
+            }
+            if (node.nodeType !== 3 || !/[\r\n]/.test(node.nodeValue)) {
+                return;
+            }
+            const lines = node.nodeValue.replace(/\r\n?/g, '\n').split('\n');
+            const parts = out.createDocumentFragment();
+            lines.forEach(function (line, i) {
+                if (i) { parts.appendChild(out.createElement('br')); }
+                if (line) { parts.appendChild(out.createTextNode(line)); }
+            });
+            node.parentNode.replaceChild(parts, node);
+        });
     }
 
     function mergeAdjacentEquivalentSpans(parent) {
