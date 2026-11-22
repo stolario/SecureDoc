@@ -13,7 +13,7 @@
 //
 //   DocHtml.load(html, mediaUrl)       stored HTML -> editor HTML (media://id -> mediaUrl(id))
 //   DocHtml.loadBody(html, mediaUrl)   the same, as an element of an inert document (no re-parse)
-//   DocHtml.store(html|element)        editor HTML -> stored HTML (src -> media://id), idempotent
+//   DocHtml.store(html|element, font)  editor HTML -> stored HTML (src -> media://id), idempotent
 //   DocHtml.paste(html, mediaUrl)      clipboard HTML -> HTML to insert (narrower formatting)
 //   DocHtml.pasteAction(clipboard)     what a paste should do: formula text, an image, HTML or text
 //   DocHtml.adoptPastedImages(root, put, changed)   pasted data:/blob: images -> own media
@@ -44,6 +44,13 @@ window.DocHtml = (function () {
         'textarea', 'datalist', 'output', 'progress', 'meter', 'dialog', 'details', 'summary', 'video', 'audio', 'source', 'track', 'picture', 'canvas', 'svg',
         'image', 'map', 'area', 'param', 'bgsound', 'marquee', 'xmp', 'plaintext', 'listing',
         'annotation', 'annotation-xml']);
+
+    // Dropped when the rebuild leaves them with no children at all: an empty one of these takes no
+    // space and carries nothing, so it is residue of editing. Deliberately empty structure is not
+    // here: <br>, <hr>, <img>, a table's cells and rows, an <li>'s bullet and <pre>'s whitespace all
+    // show up in the document even with nothing in them.
+    const EMPTY_DROP_TAGS = new Set(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'blockquote', 'ul', 'ol']);
 
     // A newline next to one of these is source formatting of the clipboard HTML, not content.
     const BLOCK_TAGS = new Set(['p', 'hr', 'div', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'blockquote', 'pre',
@@ -474,6 +481,10 @@ window.DocHtml = (function () {
         // possible. Mixed-font paragraphs still keep spans around only the runs that differ.
         if (opts.mode === 'store') { hoistWholeBlockFont(el); }
 
+        // A font-family the element already inherits says nothing: editing leaves such declarations
+        // behind on nested blocks and on spans, and they make the markup hard to read for nothing.
+        if (opts.mode === 'store') { dropInheritedFont(el, parent, opts); }
+
         // Chromium sometimes wraps a single typed space in <span style="white-space: pre"> even
         // though the document itself is already pre-wrap. Keep the space, discard that redundant
         // wrapper. If an ancestor explicitly switches whitespace back to normal, the span matters.
@@ -487,6 +498,14 @@ window.DocHtml = (function () {
             while (el.firstChild) {
                 parent.appendChild(el.firstChild);
             }
+            return;
+        }
+
+        // Nothing came out of it: the element has no text, no <br>, no image — it renders as no
+        // line at all. Editing (and other apps' HTML) leaves such shells behind, and since the
+        // children were rebuilt first, a wrapper left holding only shells is dropped with them.
+        // A deliberately blank line is <p><br></p> and keeps its <br>, so it stays.
+        if (EMPTY_DROP_TAGS.has(storedTag) && !el.firstChild) {
             return;
         }
         parent.appendChild(el);
@@ -530,6 +549,32 @@ window.DocHtml = (function () {
             while (span.firstChild) { block.insertBefore(span.firstChild, span); }
             span.remove();
         }
+    }
+
+    // Families as CSSOM writes them differ by quoting ('"Roboto Serif"' vs Roboto Serif), so compare
+    // them unquoted and case-insensitively.
+    function sameFamily(a, b) {
+        const plain = function (v) {
+            return String(v || '').replace(/["']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        };
+        return plain(a) === plain(b);
+    }
+
+    // The family the element would read in anyway: the nearest ancestor of the rebuilt tree that
+    // sets one, or — at the top level — the font of the document the content is being stored for
+    // (SecureDoc keeps it on the editor and saves it as a wrapper around this HTML; see store).
+    function inheritedFamily(parent, opts) {
+        for (let p = parent; p && p.localName !== 'body'; p = p.parentElement) {
+            if (p.style && p.style.fontFamily) { return p.style.fontFamily; }
+        }
+        return opts.font || '';
+    }
+
+    function dropInheritedFont(el, parent, opts) {
+        const family = el.style && el.style.fontFamily;
+        if (!family || !sameFamily(family, inheritedFamily(parent, opts))) { return; }
+        el.style.removeProperty('font-family');
+        if (!el.getAttribute('style')) { el.removeAttribute('style'); }
     }
 
     function redundantPreSpace(source, rebuilt) {
@@ -673,9 +718,14 @@ window.DocHtml = (function () {
         return loadBody(html, mediaUrl).innerHTML;
     }
 
-    /** `html`: editor markup, or the editor element (a copy of it) itself. */
-    function store(html) {
-        return rebuild(html, { mode: 'store' }).innerHTML;
+    /**
+     * `html`: editor markup, or the editor element (a copy of it) itself.
+     * `font`: the font-family the whole document is in, when the editor keeps one outside this
+     * markup (SecureDoc saves it as a wrapper around the result) — blocks that only repeat it are
+     * left clean. Optional: without it, a top-level block keeps the family it states.
+     */
+    function store(html, font) {
+        return rebuild(html, { mode: 'store', font: font }).innerHTML;
     }
 
     function paste(html, mediaUrl) {

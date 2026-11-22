@@ -1634,7 +1634,9 @@ window.Editor = (function () {
             if (!i.getAttribute('class')) { i.removeAttribute('class'); }
         });
         stripSizePlaceholders(clone);
-        const html = DocHtml.store(clone); // the copy itself: no serialization and re-parse in between
+        // The copy itself: no serialization and re-parse in between. The document's font goes with
+        // it so that a block merely repeating it is stored clean (the wrapper below carries it).
+        const html = DocHtml.store(clone, el.style.fontFamily);
         const family = el.style.fontFamily;
         if (!family) { return html; }
         // The document's font travels with the content, in a wrapper the allow-list already keeps
@@ -1661,6 +1663,9 @@ window.Editor = (function () {
             root = wrapper;
         }
         el.replaceChildren.apply(el, Array.prototype.slice.call(root.childNodes));
+        // A document that holds nothing (its blocks were empty shells, which the rebuild drops)
+        // still needs the one line the caret lives on.
+        if (!el.firstChild) { el.innerHTML = '<p><br></p>'; }
         lockDividers();
         mathSlots.clear();
         deselectImg();

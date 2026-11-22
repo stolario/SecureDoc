@@ -115,7 +115,16 @@ A document is **HTML** (what the editor holds); images are kept separately.
   paragraphs and text pasted without a font of their own take it. Without it the font is the
   app's own (`.editor` in `css/style.css`). The hoisting is not cosmetic — a family left on a
   `<span>` alone stops applying as soon as the caret steps out of the span (the end of the line,
-  or the line after Enter), and typing there would fall back to the app's font.
+  or the line after Enter), and typing there would fall back to the app's font. A family that only
+  repeats the one the element already inherits — from the document's wrapper or from a block it
+  sits inside — is **dropped on save** (`DocHtml.store`, given the document's font by
+  `Editor.serialize`): it changes nothing and makes the saved and exported HTML hard to read.
+- **Empty blocks** — a `<p>`, `<div>`, heading, `<blockquote>`, `<ul>`/`<ol>` or `<span>` that the
+  rebuild leaves with no children at all takes up no space in the document, so it is **dropped**
+  on open, on paste and on save (`EMPTY_DROP_TAGS` in `js/doc-html.js`); a wrapper left holding
+  only such shells goes with them. A blank line is `<p><br></p>` and keeps its `<br>`. Structure
+  that shows even when empty stays: `<br>`, `<hr>`, `<img>`, table rows and cells, an `<li>`'s
+  bullet, `<pre>`'s whitespace. A document whose every block was a shell opens as one blank line.
 - **Alignment/indentation** — `text-align` and paragraph indents (`execCommand`).
 - **Tables** — `<table class="doc-table">`; cell fill — `background-color`.
 - **Images** — `<img data-media-id="img-…" src="media://img-…">`. Image bytes are **not** in
