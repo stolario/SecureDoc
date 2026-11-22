@@ -48,8 +48,9 @@ window.DocHtml = (function () {
     // Dropped when the rebuild leaves them with no children at all: an empty one of these takes no
     // space and carries nothing, so it is residue of editing. Deliberately empty structure is not
     // here: <br>, <hr>, <img>, a table's cells and rows, an <li>'s bullet and <pre>'s whitespace all
-    // show up in the document even with nothing in them.
-    const EMPTY_DROP_TAGS = new Set(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    // show up in the document even with nothing in them, and an empty <span> may be a caret
+    // placeholder. One of these is kept too where it is the caret's only footing (holdsTheCaret).
+    const EMPTY_DROP_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'blockquote', 'ul', 'ol']);
 
     // A newline next to one of these is source formatting of the clipboard HTML, not content.
@@ -505,7 +506,7 @@ window.DocHtml = (function () {
         // line at all. Editing (and other apps' HTML) leaves such shells behind, and since the
         // children were rebuilt first, a wrapper left holding only shells is dropped with them.
         // A deliberately blank line is <p><br></p> and keeps its <br>, so it stays.
-        if (EMPTY_DROP_TAGS.has(storedTag) && !el.firstChild) {
+        if (EMPTY_DROP_TAGS.has(storedTag) && !el.firstChild && !holdsTheCaret(node, parent)) {
             return;
         }
         parent.appendChild(el);
@@ -549,6 +550,31 @@ window.DocHtml = (function () {
             while (span.firstChild) { block.insertBefore(span.firstChild, span); }
             span.remove();
         }
+    }
+
+    // Elements the caret cannot be put inside or next to: a table and an <hr> take the whole line,
+    // and a divider is locked (contenteditable="false", so Backspace cannot glue a line into it).
+    // The empty block beside one of those is the only place the caret can stand there, so it is
+    // structure — without it there is no way to type between two tables, or after a closing one,
+    // and the text goes into a cell instead.
+    function caretIsStuckBeside(el) {
+        if (!el || el.nodeType !== 1) { return false; }
+        const tag = el.localName;
+        return tag === 'table' || tag === 'hr'
+            || (el.classList && (el.classList.contains('doc-divider')
+                || el.classList.contains('document-ornament')));
+    }
+
+    // Whether an empty block is structure after all. `node` is the source element; `parent` holds
+    // what has been rebuilt before it.
+    function holdsTheCaret(node, parent) {
+        // The one line of a table cell or a list item: dropping it leaves nothing to type into.
+        const inside = parent.localName;
+        if ((inside === 'td' || inside === 'th' || inside === 'li') && !parent.firstChild
+                && !node.nextElementSibling) {
+            return true;
+        }
+        return caretIsStuckBeside(parent.lastElementChild) || caretIsStuckBeside(node.nextElementSibling);
     }
 
     // Families as CSSOM writes them differ by quoting ('"Roboto Serif"' vs Roboto Serif), so compare

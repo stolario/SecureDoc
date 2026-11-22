@@ -124,7 +124,12 @@ A document is **HTML** (what the editor holds); images are kept separately.
   on open, on paste and on save (`EMPTY_DROP_TAGS` in `js/doc-html.js`); a wrapper left holding
   only such shells goes with them. A blank line is `<p><br></p>` and keeps its `<br>`. Structure
   that shows even when empty stays: `<br>`, `<hr>`, `<img>`, table rows and cells, an `<li>`'s
-  bullet, `<pre>`'s whitespace. A document whose every block was a shell opens as one blank line.
+  bullet, `<pre>`'s whitespace, an empty `<span>` (a caret placeholder). A document whose every
+  block was a shell opens as one blank line.
+  - **The caret's footing is structure** (`holdsTheCaret`): an empty block **beside a table, an
+    `<hr>` or a divider** is kept, and so is the only block inside a cell or a list item. The
+    caret cannot be put inside a table, between two of them or after a closing one without it —
+    drop it and text typed there lands in a cell instead.
 - **Alignment/indentation** — `text-align` and paragraph indents (`execCommand`).
 - **Tables** — `<table class="doc-table">`; cell fill — `background-color`.
 - **Images** — `<img data-media-id="img-…" src="media://img-…">`. Image bytes are **not** in
