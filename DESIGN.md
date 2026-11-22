@@ -114,8 +114,9 @@ A document is **HTML** (what the editor holds); images are kept separately.
   both put a cell's inline content into `<p>`s, one per line (`blocksInCells` in `js/doc-html.js`);
   a cell that already holds blocks is left as it is, an empty one gets the paragraph the caret
   needs, and the `<br>` that closes a cell's content is its filler, not a line of its own. The
-  lines are then spaced like paragraphs anywhere else; only the last one's bottom margin is
-  dropped, so the text does not ride high in its box (`css/style.css`, and the exported CSS).
+  A cell still reads as a table and not as running text: its paragraphs carry no margin, so the
+  lines sit one under the other exactly as the bare text did (`css/style.css`, and the exported
+  CSS, which has to match — the look of a cell must not depend on which app renders it).
 - **Line breaks** — a saved document holds a soft line break as **`<br>`**. The editor itself gets
   a newline character instead: it lays the document out with `white-space: pre-wrap` (so that tabs
   and runs of spaces show as typed), and in that layout Shift+Enter writes `\n`, as does Enter

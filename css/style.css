@@ -943,9 +943,10 @@ body > .bg-anim { position: fixed; z-index: -1; }
     min-width: 48px;
     vertical-align: top;
 }
-/* A cell holds paragraphs like the rest of the document, so the lines in it are spaced the same —
-   but the last one's bottom margin would sit on top of the cell's padding and make the text ride
-   high in its box. */
+/* A cell holds paragraphs so that a line in it is a block like any other (alignment, indent, its
+   own font). It still reads as a table: the lines sit one under the other, with none of the gap
+   paragraphs keep in running text. */
+.editor table.doc-table td p { margin: 0; }
 .editor table.doc-table td > :last-child { margin-bottom: 0; }
 .editor table.doc-table[data-radius] { border-radius: var(--table-radius, 0); }
 .editor table.doc-table[data-radius] tr:first-child > :first-child { border-top-left-radius: var(--table-radius, 0); }
