@@ -943,6 +943,10 @@ body > .bg-anim { position: fixed; z-index: -1; }
     min-width: 48px;
     vertical-align: top;
 }
+/* A cell holds paragraphs like the rest of the document, so the lines in it are spaced the same —
+   but the last one's bottom margin would sit on top of the cell's padding and make the text ride
+   high in its box. */
+.editor table.doc-table td > :last-child { margin-bottom: 0; }
 .editor table.doc-table[data-radius] { border-radius: var(--table-radius, 0); }
 .editor table.doc-table[data-radius] tr:first-child > :first-child { border-top-left-radius: var(--table-radius, 0); }
 .editor table.doc-table[data-radius] tr:first-child > :last-child { border-top-right-radius: var(--table-radius, 0); }

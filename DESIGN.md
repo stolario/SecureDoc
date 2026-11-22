@@ -107,6 +107,15 @@ README.md
 A document is **HTML** (what the editor holds); images are kept separately.
 
 - **Formatting** — `<b>`, `<i>`, `<u>`; font size — `<span style="font-size:…pt">`.
+- **Table cells hold paragraphs**, like the document around them: `<td><p>…</p><p>…</p></td>`.
+  Left to itself a cell holds bare text, and then its lines are not blocks — Enter inside it writes
+  a newline instead of starting a paragraph, and everything that belongs to a block (alignment, an
+  indent, a heading, a font of its own) reaches the whole cell or nothing. So opening and saving
+  both put a cell's inline content into `<p>`s, one per line (`blocksInCells` in `js/doc-html.js`);
+  a cell that already holds blocks is left as it is, an empty one gets the paragraph the caret
+  needs, and the `<br>` that closes a cell's content is its filler, not a line of its own. The
+  lines are then spaced like paragraphs anywhere else; only the last one's bottom margin is
+  dropped, so the text does not ride high in its box (`css/style.css`, and the exported CSS).
 - **Line breaks** — a saved document holds a soft line break as **`<br>`**. The editor itself gets
   a newline character instead: it lays the document out with `white-space: pre-wrap` (so that tabs
   and runs of spaces show as typed), and in that layout Shift+Enter writes `\n`, as does Enter
@@ -402,11 +411,13 @@ entire ZIP body is deliberately readable without a passphrase.
     cell and `data-radius="10"`, a `doc-divider`, and an image resized to 40 px. It must open
     looking like that in both SecureDoc and webchat; webchat's `DocumentHtmlContractE2ETest` checks
     its side and saves the file back to `webchat/build/sdoc-roundtrip/`, and that file must open
-    here with `Editor.serialize()` equal to the original content.
+    here with `Editor.serialize()` equal to the original content — bar the one migration the
+    contract now performs on it: the cells of its table come back as `<td><p>…</p></td>` (§4).
   - `test_1.sdoc` — unencrypted, one table cell whose twelve lines are newlines in a single text
-    node, as the editor's `pre-wrap` layout holds them. Select a word in a line in the middle and
-    press **Align centre**: the whole cell must become centred with every line still there. Chrome
-    used to wrap another line in a `<div>`, move it to the wrong place and lose text (§4).
+    node, the shape cells had before they held paragraphs. It must open as twelve `<p>`s in the
+    cell, spaced like the paragraphs outside the table; select a word in a line in the middle and
+    press **Align centre**, and that line alone must become centred, every other one untouched.
+    Chrome used to wrap another line in a `<div>`, move it to the wrong place and lose text (§4).
 
 ---
 

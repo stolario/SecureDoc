@@ -1280,7 +1280,7 @@ window.Editor = (function () {
         let html = '<table class="doc-table"><tbody>';
         for (let r = 0; r < rows; r++) {
             html += '<tr>';
-            for (let c = 0; c < cols; c++) { html += '<td><br></td>'; }
+            for (let c = 0; c < cols; c++) { html += '<td><p><br></p></td>'; }
             html += '</tr>';
         }
         html += '</tbody></table><p><br></p>';
@@ -1615,7 +1615,7 @@ window.Editor = (function () {
         const nr = document.createElement('tr');
         for (let i = 0; i < cols; i++) {
             const td = document.createElement('td');
-            td.innerHTML = '<br>';
+            td.innerHTML = '<p><br></p>';
             nr.appendChild(td);
         }
         row.parentNode.insertBefore(nr, below ? row.nextSibling : row);
@@ -1629,7 +1629,7 @@ window.Editor = (function () {
         const table = cell.closest('table');
         table.querySelectorAll('tr').forEach(function (tr) {
             const td = document.createElement('td');
-            td.innerHTML = '<br>';
+            td.innerHTML = '<p><br></p>';
             const ref = tr.children[idx];
             tr.insertBefore(td, right ? (ref ? ref.nextSibling : null) : ref);
         });

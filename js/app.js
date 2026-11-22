@@ -2127,6 +2127,7 @@
                 'math{font-size:1.12em;white-space:normal}math[display="block"]{display:block;margin:12px 0;text-align:center}' +
                 'table.doc-table{border-collapse:separate;border-spacing:0;margin:10px 0;overflow:hidden;border-radius:var(--table-radius,0)}' +
                 'table.doc-table td{border:1px solid #b9c0c8;padding:6px 10px;min-width:48px;vertical-align:top}' +
+                'table.doc-table td>:last-child{margin-bottom:0}' +
                 'table.doc-table tr:first-child>:first-child{border-top-left-radius:var(--table-radius,0)}table.doc-table tr:first-child>:last-child{border-top-right-radius:var(--table-radius,0)}' +
                 'table.doc-table tr:last-child>:first-child{border-bottom-left-radius:var(--table-radius,0)}table.doc-table tr:last-child>:last-child{border-bottom-right-radius:var(--table-radius,0)}' +
                 'blockquote{margin:0 0 12px;padding-left:20px;border-left:3px solid #d7dce2}.doc-divider{text-align:center}' +

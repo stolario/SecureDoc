@@ -380,6 +380,9 @@ window.DocHtml = (function () {
         Array.prototype.slice.call(from.childNodes).forEach(function (child) {
             copyNode(child, root, out, opts);
         });
+        if (opts.mode === 'store' || opts.mode === 'load') {
+            blocksInCells(root, out);
+        }
         if (opts.mode === 'store') {
             newlinesToBreaks(root, out);
             // Contenteditable may leave inline runs directly at the editor root, without a <p>.
@@ -511,6 +514,49 @@ window.DocHtml = (function () {
             return;
         }
         parent.appendChild(el);
+    }
+
+    // A table cell holds paragraphs, like the document around it. Left to itself a cell holds bare
+    // text, and then its lines are not blocks: Enter inside it writes a newline instead of starting
+    // a paragraph, and everything that belongs to a block — alignment, indent, a heading, a font of
+    // its own — reaches the whole cell or nothing. So the cell's inline content is put into <p>s,
+    // one per line (a <br> or a newline ends a line), on open and on save alike. A cell that
+    // already holds blocks is somebody's structure and is left alone; an empty one gets the single
+    // paragraph the caret needs.
+    const CELL_BLOCKS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+        'ul', 'ol', 'dl', 'pre', 'table', 'figure']);
+
+    function blocksInCells(root, out) {
+        Array.prototype.forEach.call(root.querySelectorAll('td,th'), function (cell) {
+            const blocky = Array.prototype.some.call(cell.children, function (child) {
+                return CELL_BLOCKS.has(child.localName);
+            });
+            if (blocky) { return; }
+            const lines = [];
+            let line = out.createElement('p');
+            const endLine = function () {
+                if (!line.firstChild) { line.appendChild(out.createElement('br')); }
+                lines.push(line);
+                line = out.createElement('p');
+            };
+            Array.prototype.slice.call(cell.childNodes).forEach(function (node) {
+                if (node.nodeType === 1 && node.localName === 'br') {
+                    // The <br> that closes the content is the filler that keeps an empty line
+                    // visible, not a separator: it ends no line of its own.
+                    if (node.nextSibling) { endLine(); }
+                } else if (node.nodeType === 3 && /[\r\n]/.test(node.nodeValue)) {
+                    node.nodeValue.replace(/\r\n?/g, '\n').split('\n').forEach(function (text, i) {
+                        if (i) { endLine(); }
+                        if (text) { line.appendChild(out.createTextNode(text)); }
+                    });
+                } else {
+                    line.appendChild(node);
+                }
+            });
+            endLine();
+            while (cell.firstChild) { cell.removeChild(cell.firstChild); }
+            lines.forEach(function (p) { cell.appendChild(p); });
+        });
     }
 
     // A soft line break reaches the editor as a newline character: both editors lay the document
