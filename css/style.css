@@ -9,6 +9,16 @@
     --danger: #c0392b;
     --toolbar: #ffffff;
     --page: #ffffff;
+    /* The sheet lifted off the background: an even ambient halo, which is all the top edge gets,
+       and under it four cast shadows, each about three times the blur and offset of the one
+       before it — so the contact edge stays tight while the cast reaches far enough to read as
+       height rather than as an outline. */
+    --page-shadow:
+        0 0 10px rgba(0, 0, 0, .16),
+        0 1px 2px rgba(0, 0, 0, .3),
+        0 3px 7px rgba(0, 0, 0, .28),
+        0 9px 20px rgba(0, 0, 0, .3),
+        0 26px 52px rgba(0, 0, 0, .34);
 }
 
 * { box-sizing: border-box; }
@@ -989,7 +999,7 @@ body.bg-dim-sides::after {
     padding: 64px 72px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+    box-shadow: var(--page-shadow);
     outline: none;
     /* The font as its designers drew it: no axis is set, so every one of them stays at the value
        the file itself declares as default. */
@@ -1021,7 +1031,8 @@ body.bg-dim-sides::after {
     font-size-adjust: none;
     font-variation-settings: normal;
 }
-.editor:focus { box-shadow: 0 2px 16px rgba(30, 90, 200, .18); }
+/* Focused, the sheet keeps its shadow and gains a ring instead of trading one for the other. */
+.editor:focus { box-shadow: var(--page-shadow), 0 0 0 2px rgba(30, 90, 200, .35); }
 
 .editor p { margin: 0 0 12px; }
 .editor a { color: #2459c4; text-decoration: underline; text-underline-offset: 2px; }
