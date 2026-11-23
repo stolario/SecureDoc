@@ -711,6 +711,35 @@ body > .bg-anim { position: fixed; z-index: -1; }
         color: var(--muted);
     }
 }
+/* ── Dim the sides ──
+   An optional veil over the background to the left and right of the page: darkest at the two
+   edges, clear through the middle band where the white sheet sits. It is fixed behind every view
+   (z-index: -1) and, as ::after, comes after the animated layers in <body>, which carry the same
+   z-index — so it dims the tiling instead of being hidden under it. */
+body.bg-dim-sides::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+        rgba(0, 0, 0, .55) 0,
+        rgba(0, 0, 0, .3) 10%,
+        rgba(0, 0, 0, 0) 30%,
+        rgba(0, 0, 0, 0) 70%,
+        rgba(0, 0, 0, .3) 90%,
+        rgba(0, 0, 0, .55) 100%);
+}
+.bg-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 8px 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.bg-check input { accent-color: var(--accent); margin: 0; }
+
 .tg-cell {
     width: 16px;
     height: 16px;
@@ -965,6 +994,7 @@ body > .bg-anim { position: fixed; z-index: -1; }
     html, body { height: auto; background: #fff; }
     .view, #editor-view { height: auto; display: block; }
     .toolbar, #setup-view, #save-menu, #table-picker, #div-picker, #fill-picker, #bg-picker, .bg-anim, .img-resize-handle { display: none !important; }
+    body.bg-dim-sides::after { display: none; }
     /* Browsers drop backgrounds when printing unless told otherwise — cell fills are content. */
     .editor td, .editor th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page-wrap { display: block; overflow: visible; padding: 0; }

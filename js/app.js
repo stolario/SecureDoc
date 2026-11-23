@@ -1252,6 +1252,7 @@
         const btn = $('bg-btn');
         const KEY = 'securedoc.background';
         const PATTERN_KEY = 'securedoc.backgroundPattern';
+        const DIM_KEY = 'securedoc.backgroundDimSides';
         const COLORS = { black: '#1e1e1e', navy: '#1c2b4a', darkgrey: '#66686d', grey: '#aaacb0',
             sepia: '#e9dcc3', white: '#ffffff' };
         const DARK = new Set(['black', 'navy', 'darkgrey']);
@@ -1776,15 +1777,31 @@
                 paint(o.querySelector('.bg-pat-chip'), color, o.dataset.pattern, 0.6);
             });
         }
+        // A veil over the background at the left and right edges — a setting of its own, so it can be
+        // worn by any colour and pattern.
+        const dimBox = $('bg-dim-sides');
+        let dimSides = false;
+        function applyDim(on) {
+            dimSides = !!on;
+            document.body.classList.toggle('bg-dim-sides', dimSides);
+            dimBox.checked = dimSides;
+        }
         function save() {
             try {
                 localStorage.setItem(KEY, color);
                 localStorage.setItem(PATTERN_KEY, pattern);
+                localStorage.setItem(DIM_KEY, dimSides ? '1' : '0');
             } catch (e) { /* not kept */ }
         }
-        let saved = null, savedPattern = null;
-        try { saved = localStorage.getItem(KEY); savedPattern = localStorage.getItem(PATTERN_KEY); } catch (e) { /* default */ }
+        let saved = null, savedPattern = null, savedDim = null;
+        try {
+            saved = localStorage.getItem(KEY);
+            savedPattern = localStorage.getItem(PATTERN_KEY);
+            savedDim = localStorage.getItem(DIM_KEY);
+        } catch (e) { /* default */ }
         apply(saved, savedPattern);
+        applyDim(savedDim === '1');
+        dimBox.addEventListener('change', function () { applyDim(dimBox.checked); save(); });
 
         picker.querySelectorAll('.bg-opt').forEach(function (o) {
             o.querySelector('.bg-chip').style.background = COLORS[o.dataset.bg];
