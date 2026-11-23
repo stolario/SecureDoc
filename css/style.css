@@ -712,23 +712,50 @@ body > .bg-anim { position: fixed; z-index: -1; }
     }
 }
 /* ── Dim the sides ──
-   An optional veil over the background to the left and right of the page: darkest at the two
-   edges, clear through the middle band where the white sheet sits. It is fixed behind every view
-   (z-index: -1) and, as ::after, comes after the animated layers in <body>, which carry the same
-   z-index — so it dims the tiling instead of being hidden under it. */
+   An optional veil over the background around the page: darkest at the two edges, clear through
+   the middle band where the white sheet sits, with a weaker one rising from the bottom. It is
+   fixed behind every view (z-index: -1) and, as ::after, comes after the animated layers in
+   <body>, which carry the same z-index — so it dims the tiling instead of being hidden under it.
+
+   Two stops alone give a straight ramp, which the eye reads as a band with a visible end rather
+   than as shade. Each side is written out as a curve instead: the ink falls off as (1 − u)^2.2
+   over the width it covers, sampled every 0.15 of it — steep at the edge, flattening into
+   nothing, so there is no line where it stops. */
 body.bg-dim-sides::after {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: linear-gradient(90deg,
-        rgba(0, 0, 0, .55) 0,
-        rgba(0, 0, 0, .3) 10%,
-        rgba(0, 0, 0, 0) 30%,
-        rgba(0, 0, 0, 0) 70%,
-        rgba(0, 0, 0, .3) 90%,
-        rgba(0, 0, 0, .55) 100%);
+    background:
+        /* from the bottom, a third weaker than the sides and over a shorter run */
+        linear-gradient(to top,
+            rgba(0, 0, 0, .36) 0,
+            rgba(0, 0, 0, .257) 5.7%,
+            rgba(0, 0, 0, .175) 11.4%,
+            rgba(0, 0, 0, .112) 17.1%,
+            rgba(0, 0, 0, .066) 22.8%,
+            rgba(0, 0, 0, .032) 28.5%,
+            rgba(0, 0, 0, .008) 34.2%,
+            rgba(0, 0, 0, 0) 38%),
+        /* the two sides */
+        linear-gradient(90deg,
+            rgba(0, 0, 0, .55) 0,
+            rgba(0, 0, 0, .393) 4.5%,
+            rgba(0, 0, 0, .267) 9%,
+            rgba(0, 0, 0, .172) 13.5%,
+            rgba(0, 0, 0, .101) 18%,
+            rgba(0, 0, 0, .05) 22.5%,
+            rgba(0, 0, 0, .012) 27%,
+            rgba(0, 0, 0, 0) 30%,
+            rgba(0, 0, 0, 0) 70%,
+            rgba(0, 0, 0, .012) 73%,
+            rgba(0, 0, 0, .05) 77.5%,
+            rgba(0, 0, 0, .101) 82%,
+            rgba(0, 0, 0, .172) 86.5%,
+            rgba(0, 0, 0, .267) 91%,
+            rgba(0, 0, 0, .393) 95.5%,
+            rgba(0, 0, 0, .55) 100%);
 }
 .bg-check {
     display: flex;
